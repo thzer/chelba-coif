@@ -35,12 +35,31 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  const localBusinessSchema = {
+    "@context": "https://schema.org",
+    "@type": "BarberShop",
+    name: "Chelba Coif",
+    description:
+      "Barber shop à Djerba. Coupes modernes, fades, barbe et finitions précises.",
+    url: "https://chelba-coif-six.vercel.app",
+    telephone: "+21650882529",
+    priceRange: "15–30 TND",
+  };
+
   return (
     <html
       lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(localBusinessSchema),
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }
