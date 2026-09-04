@@ -9,6 +9,7 @@ import {
   Check,
   Clock,
   MapPin,
+  MessageCircle,
   Phone,
   Scissors,
   X,
@@ -318,7 +319,10 @@ export default function Home() {
           <motion.div
             initial={{ opacity: 0, y: 35 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            transition={{
+  duration: 0.9,
+  ease: [0.22, 1, 0.36, 1],
+}}
             className="max-w-5xl"
           >
             <div className="mb-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-white/60">
@@ -339,8 +343,7 @@ export default function Home() {
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
               <button
                 onClick={() => openBooking()}
-                className="group inline-flex items-center justify-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-bold text-black transition hover:scale-[1.03]"
-              >
+className="group inline-flex items-center justify-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-bold text-black transition-all duration-300 hover:scale-[1.04] hover:shadow-2xl hover:shadow-white/10 active:scale-[0.98]"              >
                 PRENDRE RENDEZ-VOUS
 
                 <ArrowUpRight
@@ -418,19 +421,20 @@ export default function Home() {
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {services.map((service, index) => (
-              <motion.article
-                key={service.name}
-                initial={{ opacity: 0, y: 25 }}
-                whileInView={{ opacity: 1, y: 0 }}
+             <motion.article
+  key={service.name}
+  initial={{ opacity: 0, y: 25 }}
+  whileInView={{ opacity: 1, y: 0 }}
+  whileHover={{ y: -6 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.45, delay: index * 0.04 }}
-                className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#151515]"
+                className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#151515] transition-shadow duration-500 hover:border-white/20 hover:shadow-2xl hover:shadow-black/40"
               >
                 <div className="relative h-64 overflow-hidden">
                   <img
                     src={service.image}
                     alt={service.name}
-                    className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
+                    className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
                   />
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
@@ -451,7 +455,7 @@ export default function Home() {
 
                   <button
                     onClick={() => openBooking(service.name)}
-                    className="mt-6 flex w-full items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold transition hover:border-white/30 hover:bg-white hover:text-black"
+                   className="mt-6 flex w-full items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:border-white/30 hover:bg-white hover:text-black active:scale-[0.98]"
                   >
                     Réserver cette coupe
                     <ArrowUpRight size={17} />
@@ -560,14 +564,76 @@ export default function Home() {
                 <img
                   src={image}
                   alt={`Chelba Coif gallery ${index + 1}`}
-                  className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                />
+className="h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"                />
               </motion.div>
             ))}
           </div>
         </div>
       </section>
+                  {/* AVIS CLIENTS */}
+      <section className="mx-auto max-w-7xl px-5 py-24 sm:px-6 sm:py-32">
+        <div className="mb-12">
+          <p className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
+            Avis clients
+          </p>
 
+          <h2 className="text-4xl font-black uppercase tracking-tight sm:text-6xl">
+            Ce que nos clients
+            <br />
+            pensent de nous.
+          </h2>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          <motion.article
+            initial={{ opacity: 0, y: 25 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5 }}
+            whileHover={{ y: -5 }}
+            className="rounded-3xl border border-white/10 bg-[#141414] p-7 transition-shadow duration-500 hover:border-white/20 hover:shadow-2xl hover:shadow-black/40 sm:p-9"
+          >
+            <div className="flex gap-1 text-lg">
+              ★★★★★
+            </div>
+
+            <p className="mt-6 text-lg leading-8 text-white/65">
+              « Très bon coiffeur, rapide et professionnel. Il est super
+              sympa et fait vraiment du bon travail. Je recommande ! »
+            </p>
+
+            <div className="mt-8 border-t border-white/10 pt-5">
+              <p className="font-bold">Client satisfait</p>
+
+              <p className="mt-1 text-xs uppercase tracking-[0.2em] text-white/30">
+                Avis client
+              </p>
+            </div>
+          </motion.article>
+
+          <div className="flex items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+            <div>
+              <p className="text-5xl font-black">5.0</p>
+
+              <div className="mt-3 text-xl tracking-widest">
+                ★★★★★
+              </div>
+
+              <p className="mt-4 max-w-xs text-sm leading-6 text-white/35">
+                Votre avis compte. Après votre coupe, partagez votre
+                expérience avec Chelba Coif.
+              </p>
+
+              <button
+                onClick={() => openBooking()}
+                className="mt-6 rounded-full border border-white/15 px-6 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:border-white/30 hover:bg-white hover:text-black"
+              >
+                PRENDRE RENDEZ-VOUS
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
       {/* FINAL CTA */}
       <section className="mx-auto max-w-7xl px-5 py-24 sm:px-6 sm:py-32">
         <div className="relative overflow-hidden rounded-3xl bg-white px-6 py-20 text-center text-black sm:px-10">
@@ -677,7 +743,26 @@ export default function Home() {
           </div>
         </div>
       </footer>
+      {/* FLOATING CONTACT BUTTONS */}
+      <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 sm:bottom-6 sm:right-6">
+        <a
+          href="tel:+21650882529"
+          aria-label="Appeler Chelba Coif"
+          className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white shadow-2xl backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-white hover:text-black active:scale-95"
+        >
+          <Phone size={20} />
+        </a>
 
+        <a
+          href="https://wa.me/21650882529"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Contacter Chelba Coif sur WhatsApp"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-black shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-white/10 active:scale-95"
+        >
+          <MessageCircle size={25} />
+        </a>
+      </div>
       {/* BOOKING MODAL */}
       <AnimatePresence>
         {bookingOpen && (
