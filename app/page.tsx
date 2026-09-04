@@ -621,15 +621,32 @@ export default function Home() {
               </p>
 
               <div className="space-y-4 text-sm text-white/55">
-                <div className="flex items-center gap-3">
+                {/* PHONE */}
+                <a
+                  href="tel:+21650882529"
+                  className="flex items-center gap-3 transition hover:text-white"
+                >
                   <Phone size={17} />
                   50 882 529
-                </div>
+                </a>
 
+                {/* LOCATION */}
                 <div className="flex items-center gap-3">
                   <MapPin size={17} />
                   Djerba, Tunisie
                 </div>
+
+                {/* GOOGLE MAPS */}
+                <a
+                  href="https://maps.app.goo.gl/feGWndFY3r2P7jQR9"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white hover:text-black"
+                >
+                  <MapPin size={17} />
+                  Voir l'itinéraire
+                  <ArrowUpRight size={16} />
+                </a>
               </div>
             </div>
 
@@ -896,10 +913,6 @@ export default function Home() {
                             min={today}
                             onChange={(e) => {
                               const selected = e.target.value;
-
-                              const date = new Date(
-                                `${selected}T12:00:00`
-                              );
 
                               setForm({
                                 ...form,
