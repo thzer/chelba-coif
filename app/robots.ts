@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://chelba-coif.vercel.app/sitemap.xml",
+    sitemap: "https://chelba-coif-six.vercel.app/sitemap.xml",
   };
 }
