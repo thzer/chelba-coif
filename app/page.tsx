@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -15,90 +16,63 @@ import {
   X,
 } from "lucide-react";
 
-const services = [
-  {
-    name: "Low Fade",
-    duration: "30 min",
-    price: "20 DT",
-    image:
-      "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Mid Fade",
-    duration: "30 min",
-    price: "20 DT",
-    image:
-      "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "High Fade",
-    duration: "30 min",
-    price: "22 DT",
-    image:
-      "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Taper Fade",
-    duration: "25 min",
-    price: "18 DT",
-    image:
-      "https://images.unsplash.com/photo-1512690459411-b9245aed614b?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Skin Fade",
-    duration: "35 min",
-    price: "25 DT",
-    image:
-      "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Coupe classique",
-    duration: "30 min",
-    price: "18 DT",
-    image:
-      "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Coupe aux ciseaux",
-    duration: "35 min",
-    price: "20 DT",
-    image:
-      "https://images.unsplash.com/photo-1593702295094-aea3c0a2a7f7?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Buzz Cut",
-    duration: "20 min",
-    price: "15 DT",
-    image:
-      "https://images.unsplash.com/photo-1599351431613-18ef1fdd27e1?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Barbe",
-    duration: "20 min",
-    price: "12 DT",
-    image:
-      "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=1000&q=85",
-  },
-  {
-    name: "Coupe + Barbe",
-    duration: "45 min",
-    price: "30 DT",
-    image:
-      "https://images.unsplash.com/photo-1622288432450-277d0fef5ed8?auto=format&fit=crop&w=1000&q=85",
-  },
-];
-
-const gallery = [
-  "https://images.unsplash.com/photo-1512690459411-b9245aed614b?auto=format&fit=crop&w=1200&q=85",
-  "https://images.unsplash.com/photo-1622286342621-4bd786c2447c?auto=format&fit=crop&w=1200&q=85",
-  "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?auto=format&fit=crop&w=1200&q=85",
-  "https://images.unsplash.com/photo-1599351431202-1e0f0137899a?auto=format&fit=crop&w=1200&q=85",
-  "https://images.unsplash.com/photo-1621605815971-fbc98d665033?auto=format&fit=crop&w=1200&q=85",
-  "https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=1200&q=85",
-];
 
 export default function Home() {
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [gallery, setGallery] = useState<
+  {
+    id: number;
+    image_url: string;
+    title: string | null;
+    active: boolean;
+  }[]
+>([]);
+    const [services, setServices] = useState<
+    {
+      id: number;
+      name: string;
+      duration: number;
+      price: number;
+      image_url: string | null;
+    }[]
+  >([]);
+
+  useEffect(() => {
+    async function loadServices() {
+      const { data, error } = await supabase
+        .from("services")
+        .select("id, name, duration, price, image_url")
+        .eq("active", true)
+        .order("id");
+
+      if (error) {
+        console.error("Error loading services:", error);
+        return;
+      }
+
+      setServices(data ?? []);
+    }
+
+    loadServices();
+  }, []);
+  useEffect(() => {
+  async function loadGallery() {
+    const { data, error } = await supabase
+      .from("gallery")
+      .select("id, image_url, title, active")
+      .eq("active", true)
+      .order("id", { ascending: false });
+
+    if (error) {
+      console.error("Error loading gallery:", error);
+      return;
+    }
+
+    setGallery(data ?? []);
+  }
+
+  loadGallery();
+}, []);
   const [confirmed, setConfirmed] = useState(false);
 
   const [form, setForm] = useState({
@@ -125,20 +99,44 @@ export default function Home() {
     setConfirmed(false);
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+ async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
 
-    if (
-      !form.service ||
-      !form.date ||
-      !form.time ||
-      !form.name ||
-      !form.phone
-    ) {
-      return;
-    }
+  if (
+    !form.service ||
+    !form.date ||
+    !form.time ||
+    !form.name ||
+    !form.phone
+  ) {
+    return;
+  }
 
-    const message = `🔔 NOUVELLE RÉSERVATION — CHELBA COIF
+  const selectedService = services.find(
+    (service) => service.name === form.service
+  );
+
+  if (!selectedService) {
+    console.error("Service not found");
+    return;
+  }
+
+  const { error } = await supabase.from("appointments").insert({
+    customer_name: form.name,
+    phone: form.phone,
+    service_id: selectedService.id,
+    appointment_date: form.date,
+    appointment_time: form.time,
+    status: "pending",
+  });
+
+  if (error) {
+    console.error("Error creating appointment:", error);
+    alert("Une erreur est survenue. Veuillez réessayer.");
+    return;
+  }
+
+  const message = `🔔 NOUVELLE RÉSERVATION — CHELBA COIF
 
 ✂️ Prestation : ${form.service}
 📅 Date : ${form.date}
@@ -147,14 +145,14 @@ export default function Home() {
 👤 Client : ${form.name}
 📱 Téléphone : ${form.phone}`;
 
-    const whatsappUrl = `https://wa.me/21650882529?text=${encodeURIComponent(
-      message
-    )}`;
+  const whatsappUrl = `https://wa.me/21650882529?text=${encodeURIComponent(
+    message
+  )}`;
 
-    window.open(whatsappUrl, "_blank");
+  window.open(whatsappUrl, "_blank");
 
-    setConfirmed(true);
-  }
+  setConfirmed(true);
+}
 
   const selectedService = services.find(
     (service) => service.name === form.service
@@ -205,8 +203,8 @@ export default function Home() {
 
   // Convert "30 min" -> 30
   const serviceDuration = selectedService
-    ? parseInt(selectedService.duration)
-    : 30;
+  ? selectedService.duration
+  : 30;
 
   const availableTimeSlots = allTimeSlots.filter((time) => {
     if (!selectedDate || isSunday) {
@@ -432,7 +430,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               >
                 <div className="relative h-64 overflow-hidden">
                   <img
-                    src={service.image}
+                    src={service.image_url ?? ""}
                     alt={service.name}
                     className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
                   />
@@ -440,7 +438,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
                   <div className="absolute bottom-4 left-4 rounded-full border border-white/15 bg-black/40 px-3 py-1.5 text-xs backdrop-blur-md">
-                    {service.duration}
+                    {service.duration} min
                   </div>
                 </div>
 
@@ -449,7 +447,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     <h3 className="text-lg font-bold">{service.name}</h3>
 
                     <span className="text-lg font-bold">
-                      {service.price}
+                      {service.price} DT
                     </span>
                   </div>
 
@@ -552,7 +550,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {gallery.map((image, index) => (
               <motion.div
-                key={image}
+                key={image.id}
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
@@ -562,8 +560,8 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 }`}
               >
                 <img
-                  src={image}
-                  alt={`Chelba Coif gallery ${index + 1}`}
+                  src={image.image_url}
+                  alt={image.title || `Chelba Coif gallery ${index + 1}`}
 className="h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"                />
               </motion.div>
             ))}
@@ -713,6 +711,14 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
                   Voir l'itinéraire
                   <ArrowUpRight size={16} />
                 </a>
+                  <div className="mt-6 text-center">
+    <a
+      href="/admin"
+      className="text-xs text-white/30 transition hover:text-white/60"
+    >
+      Administration
+    </a>
+  </div>
               </div>
             </div>
 
@@ -940,12 +946,12 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
                                   }`}
                                 >
                                   <Clock size={13} />
-                                  {service.duration}
+                                  {service.duration} min
                                 </div>
                               </div>
 
                               <span className="font-black">
-                                {service.price}
+                                {service.price} DT
                               </span>
                             </div>
 
