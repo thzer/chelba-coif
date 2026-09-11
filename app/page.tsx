@@ -11,6 +11,7 @@ import {
   Clock,
   MapPin,
   MessageCircle,
+  Menu,
   Phone,
   Scissors,
   X,
@@ -19,6 +20,23 @@ import {
 
 export default function Home() {
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [reviews, setReviews] = useState<
+  {
+    id: number;
+    customer_name: string | null;
+    rating: number;
+    comment: string;
+    active: boolean;
+    created_at: string;
+  }[]
+>([]);
+
+const [reviewName, setReviewName] = useState("");
+const [reviewRating, setReviewRating] = useState(5);
+const [reviewComment, setReviewComment] = useState("");
+const [reviewSubmitting, setReviewSubmitting] = useState(false);
+const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [gallery, setGallery] = useState<
   {
     id: number;
@@ -36,7 +54,16 @@ export default function Home() {
       image_url: string | null;
     }[]
   >([]);
-
+const [settings, setSettings] = useState({
+  shop_name: "Chelba Coif",
+  phone: "",
+  whatsapp: "",
+  address: "",
+  opening_hours: "",
+  instagram: "",
+  facebook: "",
+  maps_url: "",
+});
   useEffect(() => {
     async function loadServices() {
       const { data, error } = await supabase
@@ -73,6 +100,44 @@ export default function Home() {
 
   loadGallery();
 }, []);
+useEffect(() => {
+  async function loadReviews() {
+    const { data, error } = await supabase
+      .from("reviews")
+      .select("id, customer_name, rating, comment, active, created_at")
+      .eq("active", true)
+      .order("id", { ascending: false });
+
+    if (error) {
+      console.error("Error loading reviews:", error);
+      return;
+    }
+
+    setReviews(data ?? []);
+  }
+
+  loadReviews();
+}, []);
+useEffect(() => {
+async function loadSettings() {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("*")
+    .eq("id", 1)
+    .single();
+
+  if (error) {
+    console.error("Error loading settings:", error);
+    return;
+  }
+
+  if (data) {
+  setSettings(data);
+}
+}
+
+  loadSettings();
+}, []);
   const [confirmed, setConfirmed] = useState(false);
 
   const [form, setForm] = useState({
@@ -83,6 +148,35 @@ export default function Home() {
     phone: "",
   });
 
+  const [bookedAppointments, setBookedAppointments] = useState<
+    { appointment_date: string; appointment_time: string }[]
+  >([]);
+
+  useEffect(() => {
+    async function loadBookedAppointments() {
+      if (!form.date) {
+        setBookedAppointments([]);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("appointment_date, appointment_time")
+        .eq("appointment_date", form.date)
+        .in("status", ["pending", "confirmed"]);
+
+      if (error) {
+        console.error("Error loading booked appointments:", error);
+        setBookedAppointments([]);
+        return;
+      }
+
+      setBookedAppointments(data ?? []);
+    }
+
+    loadBookedAppointments();
+  }, [form.date]);
+
   function openBooking(service = "") {
     setForm((prev) => ({
       ...prev,
@@ -91,6 +185,7 @@ export default function Home() {
     }));
 
     setConfirmed(false);
+    setMobileMenuOpen(false);
     setBookingOpen(true);
   }
 
@@ -121,6 +216,26 @@ export default function Home() {
     return;
   }
 
+  const { data: existingAppointments, error: existingError } = await supabase
+    .from("appointments")
+    .select("id")
+    .eq("appointment_date", form.date)
+    .eq("appointment_time", form.time)
+    .in("status", ["pending", "confirmed"])
+    .limit(1);
+
+  if (existingError) {
+    console.error("Error checking appointment:", existingError);
+    alert("Impossible de vérifier ce créneau. Veuillez réessayer.");
+    return;
+  }
+
+  if (existingAppointments && existingAppointments.length > 0) {
+    alert("Ce créneau vient d'être réservé. Veuillez choisir une autre heure.");
+    setForm((prev) => ({ ...prev, time: "" }));
+    return;
+  }
+
   const { error } = await supabase.from("appointments").insert({
     customer_name: form.name,
     phone: form.phone,
@@ -132,6 +247,13 @@ export default function Home() {
 
   if (error) {
     console.error("Error creating appointment:", error);
+
+    if (error.code === "23505") {
+      alert("Ce créneau vient d'être réservé. Veuillez choisir une autre heure.");
+      setForm((prev) => ({ ...prev, time: "" }));
+      return;
+    }
+
     alert("Une erreur est survenue. Veuillez réessayer.");
     return;
   }
@@ -145,9 +267,10 @@ export default function Home() {
 👤 Client : ${form.name}
 📱 Téléphone : ${form.phone}`;
 
-  const whatsappUrl = `https://wa.me/21650882529?text=${encodeURIComponent(
-    message
-  )}`;
+  const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(
+  /\D/g,
+  ""
+)}?text=${encodeURIComponent(message)}`;
 
   window.open(whatsappUrl, "_blank");
 
@@ -172,7 +295,8 @@ export default function Home() {
   const selectedDay = selectedDate?.getDay();
 
   const isSunday = selectedDay === 0;
-  const isSaturday = selectedDay === 6;
+const isWednesday = selectedDay === 3;
+const isSaturday = selectedDay === 6;
 
   const openingTime = "09:00";
   const closingTime = isSaturday ? "20:00" : "19:00";
@@ -207,7 +331,15 @@ export default function Home() {
   : 30;
 
   const availableTimeSlots = allTimeSlots.filter((time) => {
-    if (!selectedDate || isSunday) {
+    if (!selectedDate || isWednesday) {
+      return false;
+    }
+
+    const isBooked = bookedAppointments.some(
+      (appointment) => appointment.appointment_time === time
+    );
+
+    if (isBooked) {
       return false;
     }
 
@@ -256,52 +388,123 @@ export default function Home() {
 
     return true;
   });
+  async function handleReviewSubmit(e: React.FormEvent) {
+  e.preventDefault();
+
+  if (
+    !reviewName.trim() ||
+    reviewComment.trim().length < 5 ||
+    reviewRating < 1 ||
+    reviewRating > 5
+  ) {
+    return;
+  }
+
+  setReviewSubmitting(true);
+
+  const { error } = await supabase.from("reviews").insert({
+    customer_name: reviewName.trim(),
+    rating: reviewRating,
+    comment: reviewComment.trim(),
+    active: false,
+  });
+
+  setReviewSubmitting(false);
+
+  if (error) {
+    console.error("Error submitting review:", error);
+    alert("Une erreur est survenue. Veuillez réessayer.");
+    return;
+  }
+
+  setReviewName("");
+  setReviewRating(5);
+  setReviewComment("");
+  setReviewSubmitted(true);
+}
+
+  const scrollTo = (id: string) => {
+    setMobileMenuOpen(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#0c0c0c] text-white">
+    <main className="min-h-screen overflow-x-hidden bg-[#0b0b0b] text-white selection:bg-white selection:text-black">
       {/* NAVBAR */}
-      <header className="fixed left-0 right-0 top-0 z-40">
-        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
-          <nav className="flex items-center justify-between rounded-full border border-white/10 bg-black/65 px-5 py-3 backdrop-blur-xl sm:px-6">
-            <a
-              href="#top"
-              className="text-sm font-black tracking-[0.25em] sm:text-base"
-            >
-              CHELBA COIF
-            </a>
+      <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-5">
+        <nav className="mx-auto flex max-w-7xl items-center justify-between rounded-2xl border border-white/10 bg-black/70 px-4 py-3 shadow-2xl shadow-black/20 backdrop-blur-2xl sm:rounded-full sm:px-6">
+          <button
+            onClick={() => scrollTo("top")}
+            className="text-sm font-black tracking-[0.22em] transition hover:opacity-70 sm:text-base"
+          >
+            {settings.shop_name || "CHELBA COIF"}
+          </button>
 
-            <div className="hidden items-center gap-8 text-sm text-white/70 md:flex">
-              <a href="#services" className="transition hover:text-white">
-                Services
-              </a>
+          <div className="hidden items-center gap-7 text-sm text-white/60 md:flex">
+            {[
+              ["services", "Services"],
+              ["experience", "À propos"],
+              ["gallery", "Galerie"],
+              ["reviews", "Avis"],
+              ["contact", "Contact"],
+            ].map(([id, label]) => (
+              <button key={id} onClick={() => scrollTo(id)} className="transition hover:text-white">
+                {label}
+              </button>
+            ))}
+          </div>
 
-              <a href="#experience" className="transition hover:text-white">
-                À propos
-              </a>
-
-              <a href="#gallery" className="transition hover:text-white">
-                Galerie
-              </a>
-
-              <a href="#contact" className="transition hover:text-white">
-                Contact
-              </a>
-            </div>
-
+          <div className="flex items-center gap-2">
             <button
               onClick={() => openBooking()}
-              className="rounded-full bg-white px-5 py-2.5 text-xs font-bold text-black transition hover:scale-105 sm:text-sm"
+              className="rounded-full bg-white px-4 py-2.5 text-[11px] font-black tracking-wide text-black transition duration-300 hover:scale-[1.03] active:scale-95 sm:px-5 sm:text-xs"
             >
               RÉSERVER
             </button>
-          </nav>
-        </div>
+
+            <button
+              onClick={() => setMobileMenuOpen((value) => !value)}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 md:hidden"
+              aria-label="Menu"
+            >
+              {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+        </nav>
+
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mx-3 mt-2 rounded-2xl border border-white/10 bg-[#111111]/95 p-2 shadow-2xl backdrop-blur-2xl sm:mx-5 md:hidden"
+            >
+              {[
+                ["services", "Services"],
+                ["experience", "À propos"],
+                ["gallery", "Galerie"],
+                ["reviews", "Avis clients"],
+                ["contact", "Contact"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => scrollTo(id)}
+                  className="flex w-full items-center justify-between rounded-xl px-4 py-3.5 text-left text-sm text-white/70 transition hover:bg-white/5 hover:text-white"
+                >
+                  {label}
+                  <ArrowRight size={15} />
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       {/* HERO */}
       <section
         id="top"
-        className="relative flex min-h-[92vh] items-end overflow-hidden sm:min-h-screen"
+        className="relative flex min-h-[92svh] items-end overflow-hidden sm:min-h-screen"
       >
         <img
           src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=2200&q=90"
@@ -313,7 +516,7 @@ export default function Home() {
 
         <div className="absolute inset-0 bg-gradient-to-t from-[#0c0c0c] via-black/20 to-black/40" />
 
-        <div className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-16 pt-36 sm:px-6 sm:pb-24">
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-14 pt-32 sm:px-6 sm:pb-24 sm:pt-40">
           <motion.div
             initial={{ opacity: 0, y: 35 }}
             animate={{ opacity: 1, y: 0 }}
@@ -328,7 +531,7 @@ export default function Home() {
               Barber Shop • Djerba
             </div>
 
-            <h1 className="max-w-5xl text-5xl font-black uppercase leading-[0.86] tracking-[-0.04em] sm:text-7xl lg:text-[110px]">
+            <h1 className="max-w-5xl text-[15vw] font-black uppercase leading-[0.84] tracking-[-0.055em] sm:text-7xl lg:text-[105px]">
               La coupe
               <br />
               <span className="text-white/45">nette.</span>
@@ -368,7 +571,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
       </section>
 
       {/* INTRO */}
-      <section className="mx-auto max-w-7xl px-5 py-24 sm:px-6 sm:py-32">
+      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-6 sm:py-28">
         <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>
             <p className="mb-5 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
@@ -398,7 +601,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
       </section>
 
       {/* SERVICES */}
-      <section id="services" className="bg-[#101010] py-24 sm:py-32">
+      <section id="services" className="bg-[#101010] py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-5 sm:px-6">
           <div className="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
             <div>
@@ -417,7 +620,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
             </p>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {services.map((service, index) => (
              <motion.article
   key={service.name}
@@ -426,10 +629,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
   whileHover={{ y: -6 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.45, delay: index * 0.04 }}
-                className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#151515] transition-shadow duration-500 hover:border-white/20 hover:shadow-2xl hover:shadow-black/40"
+                className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#151515] transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-2xl hover:shadow-black/40"
               >
-                <div className="relative h-64 overflow-hidden">
+                <div className="relative h-56 overflow-hidden sm:h-64">
                   <img
+                    loading="lazy"
                     src={service.image_url ?? ""}
                     alt={service.name}
                     className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
@@ -468,11 +672,12 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
       {/* EXPERIENCE */}
       <section
         id="experience"
-        className="mx-auto max-w-7xl px-5 py-24 sm:px-6 sm:py-32"
+        className="mx-auto max-w-7xl px-5 py-20 sm:px-6 sm:py-28"
       >
         <div className="grid overflow-hidden rounded-3xl border border-white/10 bg-[#141414] lg:grid-cols-2">
           <div className="relative min-h-[450px]">
             <img
+                    loading="lazy"
               src="https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1400&q=90"
               alt="Barber experience"
               className="absolute inset-0 h-full w-full object-cover"
@@ -535,7 +740,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
       </section>
 
       {/* GALLERY */}
-      <section id="gallery" className="bg-[#101010] py-24 sm:py-32">
+      <section id="gallery" className="bg-[#101010] py-20 sm:py-28">
         <div className="mx-auto max-w-7xl px-5 sm:px-6">
           <div className="mb-12">
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
@@ -556,10 +761,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.05 }}
                 className={`group overflow-hidden rounded-2xl ${
-                  index === 0 ? "lg:row-span-2 lg:h-[660px]" : "h-80"
+                  index === 0 ? "sm:row-span-2 sm:h-[530px] lg:h-[650px]" : "h-72 sm:h-80"
                 }`}
               >
                 <img
+                    loading="lazy"
                   src={image.image_url}
                   alt={image.title || `Chelba Coif gallery ${index + 1}`}
 className="h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"                />
@@ -568,72 +774,172 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
           </div>
         </div>
       </section>
-                  {/* AVIS CLIENTS */}
-      <section className="mx-auto max-w-7xl px-5 py-24 sm:px-6 sm:py-32">
-        <div className="mb-12">
-          <p className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
-            Avis clients
+{/* AVIS CLIENTS */}
+<section
+  id="reviews"
+  className="mx-auto max-w-7xl px-5 py-20 sm:px-6 sm:py-28"
+>
+  <div className="mb-12">
+    <p className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
+      Avis clients
+    </p>
+
+    <h2 className="text-4xl font-black uppercase tracking-tight sm:text-6xl">
+      Ce que nos clients
+      <br />
+      pensent de nous.
+    </h2>
+  </div>
+
+  {/* APPROVED REVIEWS */}
+  {reviews.length > 0 && (
+    <div className="grid gap-5 md:grid-cols-2">
+      {reviews.map((review) => (
+        <motion.article
+          key={review.id}
+          initial={{ opacity: 0, y: 25 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          whileHover={{ y: -5 }}
+          className="rounded-3xl border border-white/10 bg-[#141414] p-7 transition-shadow duration-500 hover:border-white/20 hover:shadow-2xl hover:shadow-black/40 sm:p-9"
+        >
+          <div className="text-lg tracking-wider">
+            {"★".repeat(review.rating)}
+            <span className="text-white/20">
+              {"★".repeat(5 - review.rating)}
+            </span>
+          </div>
+
+          <p className="mt-6 text-lg leading-8 text-white/65">
+            « {review.comment} »
           </p>
 
-          <h2 className="text-4xl font-black uppercase tracking-tight sm:text-6xl">
-            Ce que nos clients
-            <br />
-            pensent de nous.
-          </h2>
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-2">
-          <motion.article
-            initial={{ opacity: 0, y: 25 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.5 }}
-            whileHover={{ y: -5 }}
-            className="rounded-3xl border border-white/10 bg-[#141414] p-7 transition-shadow duration-500 hover:border-white/20 hover:shadow-2xl hover:shadow-black/40 sm:p-9"
-          >
-            <div className="flex gap-1 text-lg">
-              ★★★★★
-            </div>
-
-            <p className="mt-6 text-lg leading-8 text-white/65">
-              « Très bon coiffeur, rapide et professionnel. Il est super
-              sympa et fait vraiment du bon travail. Je recommande ! »
+          <div className="mt-8 border-t border-white/10 pt-5">
+            <p className="font-bold">
+              {review.customer_name || "Client"}
             </p>
 
-            <div className="mt-8 border-t border-white/10 pt-5">
-              <p className="font-bold">Client satisfait</p>
-
-              <p className="mt-1 text-xs uppercase tracking-[0.2em] text-white/30">
-                Avis client
-              </p>
-            </div>
-          </motion.article>
-
-          <div className="flex items-center justify-center rounded-3xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
-            <div>
-              <p className="text-5xl font-black">5.0</p>
-
-              <div className="mt-3 text-xl tracking-widest">
-                ★★★★★
-              </div>
-
-              <p className="mt-4 max-w-xs text-sm leading-6 text-white/35">
-                Votre avis compte. Après votre coupe, partagez votre
-                expérience avec Chelba Coif.
-              </p>
-
-              <button
-                onClick={() => openBooking()}
-                className="mt-6 rounded-full border border-white/15 px-6 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:border-white/30 hover:bg-white hover:text-black"
-              >
-                PRENDRE RENDEZ-VOUS
-              </button>
-            </div>
+            <p className="mt-1 text-xs uppercase tracking-[0.2em] text-white/30">
+              Client Chelba Coif
+            </p>
           </div>
+        </motion.article>
+      ))}
+    </div>
+  )}
+
+  {/* REVIEW FORM */}
+  <div className="mt-8 rounded-3xl border border-white/10 bg-[#141414] p-7 sm:p-9">
+    {reviewSubmitted ? (
+      <div className="py-8 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white text-black">
+          <Check size={28} />
         </div>
-      </section>
+
+        <h3 className="mt-5 text-2xl font-black uppercase">
+          Merci pour votre avis !
+        </h3>
+
+        <p className="mt-3 text-sm text-white/40">
+          Votre avis sera vérifié avant d'être publié sur le site.
+        </p>
+      </div>
+    ) : (
+      <>
+        <div className="mb-7">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/30">
+            Votre expérience
+          </p>
+
+          <h3 className="mt-2 text-2xl font-black uppercase sm:text-3xl">
+            Laissez votre avis
+          </h3>
+        </div>
+
+        <form
+          onSubmit={handleReviewSubmit}
+          className="grid gap-5 lg:grid-cols-2"
+        >
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
+              Votre nom
+            </label>
+
+            <input
+              type="text"
+              value={reviewName}
+              onChange={(e) => setReviewName(e.target.value)}
+              placeholder="Ex. Ahmed"
+              required
+              className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/40"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
+              Votre note
+            </label>
+
+            <select
+              value={reviewRating}
+              onChange={(e) =>
+                setReviewRating(Number(e.target.value))
+              }
+              className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none focus:border-white/40"
+            >
+              <option value={5}>★★★★★ — Excellent</option>
+              <option value={4}>★★★★☆ — Très bien</option>
+              <option value={3}>★★★☆☆ — Bien</option>
+              <option value={2}>★★☆☆☆ — Moyen</option>
+              <option value={1}>★☆☆☆☆ — À améliorer</option>
+            </select>
+          </div>
+
+          <div className="lg:col-span-2">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
+              Votre commentaire
+            </label>
+
+            <textarea
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              placeholder="Partagez votre expérience chez Chelba Coif..."
+              rows={5}
+              minLength={5}
+              maxLength={1000}
+              required
+              className="w-full resize-none rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/40"
+            />
+          </div>
+
+          <div className="lg:col-span-2">
+            <button
+              type="submit"
+              disabled={
+                reviewSubmitting ||
+                !reviewName.trim() ||
+                reviewComment.trim().length < 5
+              }
+              className="inline-flex w-full items-center justify-center gap-3 rounded-xl bg-white px-6 py-4 text-sm font-black text-black transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-30"
+            >
+              {reviewSubmitting
+                ? "ENVOI EN COURS..."
+                : "PUBLIER MON AVIS"}
+
+              <ArrowUpRight size={18} />
+            </button>
+
+            <p className="mt-3 text-center text-xs text-white/25">
+              Votre avis sera publié après validation par Chelba Coif.
+            </p>
+          </div>
+        </form>
+      </>
+    )}
+  </div>
+</section>
       {/* FINAL CTA */}
-      <section className="mx-auto max-w-7xl px-5 py-24 sm:px-6 sm:py-32">
+      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-6 sm:py-28">
         <div className="relative overflow-hidden rounded-3xl bg-white px-6 py-20 text-center text-black sm:px-10">
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-black/[0.04]" />
 
@@ -670,13 +976,50 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
           <div className="grid gap-12 md:grid-cols-3">
             <div>
               <p className="text-lg font-black tracking-[0.2em]">
-                CHELBA COIF
+                {settings.shop_name || "CHELBA COIF"}
               </p>
 
               <p className="mt-4 max-w-xs text-sm leading-7 text-white/35">
                 Barber shop moderne à Djerba. Coupes précises, style
                 personnalisé.
               </p>
+              <div className="mt-6 flex items-center gap-3">
+  {settings.instagram && (
+    <a
+      href={settings.instagram}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Instagram"
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/60 transition hover:bg-white hover:text-black"
+    >
+      <svg
+  viewBox="0 0 24 24"
+  className="h-5 w-5"
+  fill="currentColor"
+>
+  <path d="M7.8 2h8.4A5.8 5.8 0 0 1 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8A5.8 5.8 0 0 1 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2Zm-.2 2A3.8 3.8 0 0 0 4 7.8v8.4A3.8 3.8 0 0 0 7.8 20h8.4a3.8 3.8 0 0 0 3.8-3.8V7.8A3.8 3.8 0 0 0 16.2 4H7.6Zm8.9 1.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
+</svg>
+    </a>
+  )}
+
+  {settings.facebook && (
+    <a
+      href={settings.facebook}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Facebook"
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/60 transition hover:bg-white hover:text-black"
+    >
+      <svg
+  viewBox="0 0 24 24"
+  className="h-5 w-5"
+  fill="currentColor"
+>
+  <path d="M13.5 21v-8h2.7l.4-3h-3.1V8.1c0-.9.3-1.5 1.6-1.5h1.7V4a22 22 0 0 0-2.5-.1c-2.5 0-4.2 1.5-4.2 4.2V10H7.4v3h2.7v8h3.4Z" />
+</svg>
+    </a>
+  )}
+</div>
             </div>
 
             <div>
@@ -687,22 +1030,22 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
               <div className="space-y-4 text-sm text-white/55">
                 {/* PHONE */}
                 <a
-                  href="tel:+21650882529"
-                  className="flex items-center gap-3 transition hover:text-white"
-                >
-                  <Phone size={17} />
-                  50 882 529
-                </a>
+  href={`tel:${settings.phone}`}
+  className="flex items-center gap-3 transition hover:text-white"
+>
+  <Phone size={17} />
+  {settings.phone || "Téléphone non renseigné"}
+</a>
 
                 {/* LOCATION */}
                 <div className="flex items-center gap-3">
                   <MapPin size={17} />
-                  Djerba, Tunisie
+                  {settings.address || "Adresse non renseignée"}
                 </div>
 
                 {/* GOOGLE MAPS */}
                 <a
-                  href="https://maps.app.goo.gl/feGWndFY3r2P7jQR9"
+                  href={settings.maps_url || "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white hover:text-black"
@@ -728,18 +1071,19 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
               </p>
 
               <div className="space-y-4 text-sm text-white/55">
-                <div className="flex items-center gap-3">
-                  <Clock size={17} />
-                  Lun – Ven : 09:00 – 19:00
-                </div>
+                <div className="flex items-start gap-3">
+  <Clock size={17} className="mt-1 shrink-0" />
 
-                <div className="ml-7">
-                  Sam : 09:00 – 20:00
-                </div>
-
-                <div className="ml-7 text-white/30">
-                  Dimanche : fermé
-                </div>
+  <div className="space-y-1">
+    <div>Lun – Mar : 09:00 – 19:00</div>
+    <div className="text-white/40">
+      Mercredi : fermé
+    </div>
+    <div>Jeu – Ven : 09:00 – 19:00</div>
+    <div>Samedi : 09:00 – 20:00</div>
+    <div>Dimanche : 09:00 – 19:00</div>
+  </div>
+</div>
               </div>
             </div>
           </div>
@@ -750,21 +1094,21 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
         </div>
       </footer>
       {/* FLOATING CONTACT BUTTONS */}
-      <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 sm:bottom-6 sm:right-6">
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 sm:bottom-6 sm:right-6 sm:gap-3">
         <a
-          href="tel:+21650882529"
+          href={`tel:${settings.phone}`}
           aria-label="Appeler Chelba Coif"
-          className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white shadow-2xl backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-white hover:text-black active:scale-95"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white shadow-2xl backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-white hover:text-black active:scale-95"
         >
           <Phone size={20} />
         </a>
 
         <a
-          href="https://wa.me/21650882529"
+          href={`https://wa.me/${settings.whatsapp.replace(/\D/g, "")}`}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Contacter Chelba Coif sur WhatsApp"
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-black shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-white/10 active:scale-95"
+          className="flex h-13 w-13 items-center justify-center rounded-full bg-white text-black shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-white/10 active:scale-95"
         >
           <MessageCircle size={25} />
         </a>
@@ -776,7 +1120,7 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/80 p-0 backdrop-blur-md sm:items-center sm:p-4"
             onClick={closeBooking}
           >
             <motion.div
@@ -785,10 +1129,10 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
               exit={{ opacity: 0, y: 20, scale: 0.96 }}
               transition={{ duration: 0.25 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-white/10 bg-[#151515] shadow-2xl"
+              className="max-h-[94svh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-[#151515] shadow-2xl sm:max-w-2xl sm:rounded-3xl"
             >
               {/* MODAL HEADER */}
-              <div className="sticky top-0 z-10 border-b border-white/10 bg-[#151515]/95 px-6 py-6 backdrop-blur-xl sm:px-8">
+              <div className="sticky top-0 z-10 border-b border-white/10 bg-[#151515]/95 px-5 py-5 backdrop-blur-xl sm:px-8 sm:py-6">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/30">
@@ -890,7 +1234,7 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
               ) : (
                 <form
                   onSubmit={handleSubmit}
-                  className="px-6 py-7 sm:px-8"
+                  className="px-5 py-6 sm:px-8 sm:py-7"
                 >
                   {/* STEP 01 */}
                   <div>
@@ -1016,11 +1360,11 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
                           />
                         </div>
 
-                        {form.date && isSunday && (
-                          <p className="mt-2 text-xs font-semibold text-white/40">
-                            Le salon est fermé le dimanche.
-                          </p>
-                        )}
+                        {form.date && isWednesday && (
+  <p className="mt-2 text-xs font-semibold text-white/40">
+    Le salon est fermé le mercredi.
+  </p>
+)}
 
                         {form.date && !isSunday && (
                           <p className="mt-2 text-xs text-white/25">
@@ -1043,45 +1387,43 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
                             className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
                           />
 
-                          <select
-                            value={form.time}
-                            disabled={!form.date || isSunday}
-                            onChange={(e) =>
-                              setForm({
-                                ...form,
-                                time: e.target.value,
-                              })
-                            }
-                            required
-                            className="w-full appearance-none rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 pl-11 text-sm text-white outline-none transition focus:border-white/40 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <option value="">
-                              {!form.date
-                                ? "Choisissez d'abord une date"
-                                : isSunday
-                                ? "Salon fermé le dimanche"
-                                : availableTimeSlots.length === 0
-                                ? "Aucun créneau disponible"
-                                : "Choisir une heure"}
-                            </option>
+<select
+  value={form.time}
+  disabled={!form.date || isWednesday}
+  onChange={(e) =>
+    setForm({
+      ...form,
+      time: e.target.value,
+    })
+  }
+  required
+  className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 pl-11 text-sm text-white outline-none transition focus:border-white/40"
+>
+  <option value="">
+    {!form.date
+      ? "Choisissez d'abord une date"
+      : isWednesday
+      ? "Salon fermé le mercredi"
+      : availableTimeSlots.length === 0
+      ? "Aucun créneau disponible"
+      : "Choisir une heure"}
+  </option>
 
-                            {availableTimeSlots.map((time) => (
-                              <option key={time} value={time}>
-                                {time}
-                              </option>
-                            ))}
-                          </select>
+  {availableTimeSlots.map((time) => (
+    <option key={time} value={time}>
+      {time}
+    </option>
+  ))}
+</select>
                         </div>
 
-                        {form.date &&
-                          !isSunday &&
-                          form.date === today &&
-                          availableTimeSlots.length === 0 && (
-                            <p className="mt-2 text-xs text-white/35">
-                              Tous les créneaux restants sont passés ou
-                              indisponibles aujourd'hui.
-                            </p>
-                          )}
+                        {form.date && !isWednesday && (
+  <p className="mt-2 text-xs text-white/25">
+    {isSaturday
+      ? "Samedi : 09:00 – 20:00"
+      : "09:00 – 19:00"}
+  </p>
+)}
                       </div>
                     </div>
                   </div>
