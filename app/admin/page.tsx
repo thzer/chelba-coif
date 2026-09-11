@@ -3115,7 +3115,7 @@ function AppointmentRow({
 }: {
   appointment: Appointment;
   service:
-    | Appointment["services"][number]
+    | NonNullable<Appointment["services"]>[number]
     | undefined;
   onClick: () => void;
 }) {
@@ -3185,7 +3185,7 @@ function AppointmentCard({
 }: {
   appointment: Appointment;
   service:
-    | Appointment["services"][number]
+    | NonNullable<Appointment["services"]>[number]
     | undefined;
   onConfirm: () => void;
   onComplete: () => void;
