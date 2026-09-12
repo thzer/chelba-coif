@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { safeHttpUrl } from "@/lib/url";
+import {
+  type Lang,
+  DEFAULT_LANG,
+  LANGS,
+  dictionaries,
+  fill,
+  isLang,
+  langMeta,
+} from "@/lib/i18n";
 import Image from "next/image";
 import { SmartImage } from "@/components/SmartImage";
 import {
   type BookedSlot,
   type Closure,
   type WeekSchedule,
-  DAY_NAMES_FR,
   DEFAULT_SCHEDULE,
   DEFAULT_SLOT_INTERVAL,
   WEEK_DAYS,
@@ -43,6 +51,40 @@ function isValidPhone(value: string) {
 }
 
 export default function Home() {
+  const [lang, setLang] = useState<Lang>(DEFAULT_LANG);
+  const t = dictionaries[lang];
+  const { locale, dir } = langMeta(lang);
+
+  const formatLongDate = (date: string) =>
+    new Date(`${date}T12:00:00`).toLocaleDateString(locale, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+
+  // Langue mémorisée, sinon celle du navigateur.
+  useEffect(() => {
+    let initial: Lang = DEFAULT_LANG;
+    try {
+      const saved = localStorage.getItem("lang");
+      if (isLang(saved)) initial = saved;
+      else {
+        const nav = navigator.language.slice(0, 2);
+        if (isLang(nav)) initial = nav;
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLang(initial);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dir;
+    try {
+      localStorage.setItem("lang", lang);
+    } catch {}
+  }, [lang, dir]);
+
   const [bookingOpen, setBookingOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reviews, setReviews] = useState<
@@ -278,17 +320,17 @@ async function loadClosures() {
   }
 
   if (customerName.length > NAME_MAX_LENGTH) {
-    alert(`Le nom ne doit pas dépasser ${NAME_MAX_LENGTH} caractères.`);
+    alert(fill(t.alert_name_too_long, { max: NAME_MAX_LENGTH }));
     return;
   }
 
   if (!isValidPhone(customerPhone)) {
-    alert("Veuillez saisir un numéro de téléphone valide.");
+    alert(t.alert_phone);
     return;
   }
 
   if (form.date < today || !availableTimeSlots.includes(form.time)) {
-    alert("Ce créneau n'est plus disponible. Veuillez en choisir un autre.");
+    alert(t.alert_slot_gone);
     setForm((prev) => ({ ...prev, time: "" }));
     return;
   }
@@ -314,13 +356,13 @@ async function loadClosures() {
 
   if (existingError) {
     console.error("Error checking appointment:", existingError);
-    alert("Impossible de vérifier ce créneau. Veuillez réessayer.");
+    alert(t.alert_slot_check);
     setSubmitting(false);
     return;
   }
 
   if (existingAppointments && existingAppointments.length > 0) {
-    alert("Ce créneau vient d'être réservé. Veuillez choisir une autre heure.");
+    alert(t.alert_slot_taken);
     setForm((prev) => ({ ...prev, time: "" }));
     setSubmitting(false);
     return;
@@ -341,12 +383,12 @@ async function loadClosures() {
     console.error("Error creating appointment:", error);
 
     if (error.code === "23505") {
-      alert("Ce créneau vient d'être réservé. Veuillez choisir une autre heure.");
+      alert(t.alert_slot_taken);
       setForm((prev) => ({ ...prev, time: "" }));
       return;
     }
 
-    alert("Une erreur est survenue. Veuillez réessayer.");
+    alert(t.alert_generic);
     return;
   }
 
@@ -426,7 +468,7 @@ async function loadClosures() {
 
   if (error) {
     console.error("Error submitting review:", error);
-    alert("Une erreur est survenue. Veuillez réessayer.");
+    alert(t.alert_generic);
     return;
   }
 
@@ -463,11 +505,11 @@ async function loadClosures() {
 
           <div className="hidden items-center gap-7 text-sm text-white/60 md:flex">
             {[
-              ["services", "Services"],
-              ["experience", "À propos"],
-              ["gallery", "Galerie"],
-              ["reviews", "Avis"],
-              ["contact", "Contact"],
+              ["services", t.nav_services],
+              ["experience", t.nav_about],
+              ["gallery", t.nav_gallery],
+              ["reviews", t.nav_reviews],
+              ["contact", t.nav_contact],
             ].map(([id, label]) => (
               <button key={id} onClick={() => scrollTo(id)} className="transition hover:text-white">
                 {label}
@@ -476,17 +518,33 @@ async function loadClosures() {
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 text-[11px] font-bold">
+              {LANGS.map((l) => (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => setLang(l.code)}
+                  aria-label={l.label}
+                  className={`rounded-full px-2.5 py-1 transition ${
+                    lang === l.code ? "bg-white text-black" : "text-white/50 hover:text-white"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={() => openBooking()}
               className="rounded-full bg-white px-4 py-2.5 text-[11px] font-black tracking-wide text-black transition duration-300 hover:scale-[1.03] active:scale-95 sm:px-5 sm:text-xs"
             >
-              RÉSERVER
+              {t.book}
             </button>
 
             <button
               onClick={() => setMobileMenuOpen((value) => !value)}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 md:hidden"
-              aria-label="Menu"
+              aria-label={t.menu}
             >
               {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
@@ -501,12 +559,30 @@ async function loadClosures() {
               exit={{ opacity: 0, y: -8 }}
               className="mx-3 mt-2 rounded-2xl border border-white/10 bg-[#111111]/95 p-2 shadow-2xl backdrop-blur-2xl sm:mx-5 md:hidden"
             >
+              <div className="mb-2 flex justify-center">
+              <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 text-[11px] font-bold">
+              {LANGS.map((l) => (
+                <button
+                  key={l.code}
+                  type="button"
+                  onClick={() => setLang(l.code)}
+                  aria-label={l.label}
+                  className={`rounded-full px-2.5 py-1 transition ${
+                    lang === l.code ? "bg-white text-black" : "text-white/50 hover:text-white"
+                  }`}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+              </div>
+
               {[
-                ["services", "Services"],
-                ["experience", "À propos"],
-                ["gallery", "Galerie"],
-                ["reviews", "Avis clients"],
-                ["contact", "Contact"],
+                ["services", t.nav_services],
+                ["experience", t.nav_about],
+                ["gallery", t.nav_gallery],
+                ["reviews", t.nav_reviews_long],
+                ["contact", t.nav_contact],
               ].map(([id, label]) => (
                 <button
                   key={id}
@@ -529,7 +605,7 @@ async function loadClosures() {
       >
         <SmartImage
           src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=2200&q=90"
-          alt="Barber shop"
+          alt={t.hero_img_alt}
           priority
           className="object-cover"
         />
@@ -550,24 +626,24 @@ async function loadClosures() {
           >
             <div className="mb-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.28em] text-white/60">
               <span className="h-px w-8 bg-white/50" />
-              Barber Shop • Djerba
+              {t.hero_tag}
             </div>
 
             <h1 className="max-w-5xl text-[15vw] font-black uppercase leading-[0.84] tracking-[-0.055em] sm:text-7xl lg:text-[105px]">
-              La coupe
+              {t.hero_l1}
               <br />
-              <span className="text-white/45">nette.</span>
+              <span className="text-white/45">{t.hero_l2}</span>
               <br />
-              Le style
+              {t.hero_l3}
               <br />
-              qui dure.
+              {t.hero_l4}
             </h1>
 
             <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
               <button
                 onClick={() => openBooking()}
 className="group inline-flex items-center justify-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-bold text-black transition-all duration-300 hover:scale-[1.04] hover:shadow-2xl hover:shadow-white/10 active:scale-[0.98]"              >
-                PRENDRE RENDEZ-VOUS
+                {t.hero_cta}
 
                 <ArrowUpRight
                   size={18}
@@ -579,15 +655,15 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 href="#services"
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-7 py-4 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/10"
               >
-                Voir les services
+                {t.hero_services}
                 <ArrowRight size={17} />
               </a>
             </div>
           </motion.div>
         </div>
 
-        <div className="absolute bottom-8 right-6 hidden text-right text-xs uppercase tracking-[0.2em] text-white/40 lg:block">
-          Scroll to explore
+        <div className="absolute bottom-8 right-6 hidden text-right rtl:left-6 rtl:right-auto rtl:text-left text-xs uppercase tracking-[0.2em] text-white/40 lg:block">
+          {t.hero_scroll}
           <div className="ml-auto mt-3 h-12 w-px bg-white/20" />
         </div>
       </section>
@@ -597,26 +673,24 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
         <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>
             <p className="mb-5 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
-              L&apos;art du détail
+              {t.intro_tag}
             </p>
 
             <h2 className="max-w-3xl text-4xl font-black uppercase leading-[0.95] tracking-tight sm:text-6xl">
-              Votre style.
+              {t.intro_h_l1}
               <br />
-              Notre précision.
+              {t.intro_h_l2}
             </h2>
           </div>
 
           <div>
             <p className="text-base leading-8 text-white/50 sm:text-lg">
-              Une coupe réussie commence par l&apos;écoute. Chez Chelba Coif,
-              chaque détail est travaillé pour créer un résultat propre,
-              moderne et adapté à votre style.
+              {t.intro_p}
             </p>
 
             <div className="mt-8 flex items-center gap-3 text-sm font-semibold">
               <Scissors size={18} />
-              Coupes modernes & finitions précises
+              {t.intro_badge}
             </div>
           </div>
         </div>
@@ -628,17 +702,16 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
           <div className="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
             <div>
               <p className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
-                Prestations
+                {t.services_tag}
               </p>
 
               <h2 className="text-4xl font-black uppercase tracking-tight sm:text-6xl">
-                Nos services
+                {t.services_h}
               </h2>
             </div>
 
             <p className="max-w-sm text-sm leading-6 text-white/40">
-              Choisissez votre coupe et réservez votre créneau en quelques
-              secondes.
+              {t.services_p}
             </p>
           </div>
 
@@ -664,7 +737,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
                   <div className="absolute bottom-4 left-4 rounded-full border border-white/15 bg-black/40 px-3 py-1.5 text-xs backdrop-blur-md">
-                    {service.duration} min
+                    {service.duration} {t.minutes}
                   </div>
                 </div>
 
@@ -673,7 +746,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     <h3 className="text-lg font-bold">{service.name}</h3>
 
                     <span className="text-lg font-bold">
-                      {service.price} DT
+                      {service.price} {t.currency}
                     </span>
                   </div>
 
@@ -681,7 +754,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     onClick={() => openBooking(service.name)}
                    className="mt-6 flex w-full items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 hover:border-white/30 hover:bg-white hover:text-black active:scale-[0.98]"
                   >
-                    Réserver cette coupe
+                    {t.book_this}
                     <ArrowUpRight size={17} />
                   </button>
                 </div>
@@ -700,7 +773,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
           <div className="relative min-h-[450px]">
             <SmartImage
               src="https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1400&q=90"
-              alt="Barber experience"
+              alt={t.exp_img_alt}
               sizes="(min-width: 1024px) 50vw, 100vw"
               className="object-cover"
             />
@@ -712,24 +785,23 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 Chelba Coif
               </p>
 
-              <p className="mt-1 font-bold">Djerba, Tunisie</p>
+              <p className="mt-1 font-bold">{t.exp_location}</p>
             </div>
           </div>
 
           <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-16">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/35">
-              L&apos;expérience
+              {t.exp_tag}
             </p>
 
             <h2 className="mt-5 text-4xl font-black uppercase leading-[0.95] sm:text-5xl">
-              Plus qu&apos;une coupe.
+              {t.exp_h_l1}
               <br />
-              Une expérience.
+              {t.exp_h_l2}
             </h2>
 
             <p className="mt-7 max-w-lg leading-8 text-white/45">
-              Un espace pensé pour prendre le temps, discuter de votre style
-              et obtenir une finition à la hauteur de vos attentes.
+              {t.exp_p}
             </p>
 
             <div className="mt-9 grid grid-cols-2 gap-4">
@@ -737,7 +809,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 <p className="text-2xl font-black">10+</p>
 
                 <p className="mt-1 text-xs text-white/40">
-                  Prestations
+                  {t.services_tag}
                 </p>
               </div>
 
@@ -745,7 +817,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 <p className="text-2xl font-black">100%</p>
 
                 <p className="mt-1 text-xs text-white/40">
-                  Passion
+                  {t.exp_stat_passion}
                 </p>
               </div>
             </div>
@@ -754,7 +826,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               onClick={() => openBooking()}
               className="mt-8 inline-flex w-fit items-center gap-3 rounded-full bg-white px-7 py-4 text-sm font-bold text-black transition hover:scale-105"
             >
-              RÉSERVER
+              {t.book}
               <ArrowUpRight size={18} />
             </button>
           </div>
@@ -766,11 +838,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
         <div className="mx-auto max-w-7xl px-5 sm:px-6">
           <div className="mb-12">
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
-              Inspiration
+              {t.gallery_tag}
             </p>
 
             <h2 className="text-4xl font-black uppercase sm:text-6xl">
-              Galerie
+              {t.gallery_h}
             </h2>
           </div>
 
@@ -788,7 +860,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               >
                 <SmartImage
                   src={safeHttpUrl(image.image_url) ?? ""}
-                  alt={image.title || `Chelba Coif gallery ${index + 1}`}
+                  alt={image.title || `${t.gallery_alt} ${index + 1}`}
                   sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                   className="object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
                 />
@@ -804,13 +876,13 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 >
   <div className="mb-12">
     <p className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
-      Avis clients
+      {t.reviews_tag}
     </p>
 
     <h2 className="text-4xl font-black uppercase tracking-tight sm:text-6xl">
-      Ce que nos clients
+      {t.reviews_h_l1}
       <br />
-      pensent de nous.
+      {t.reviews_h_l2}
     </h2>
   </div>
 
@@ -839,11 +911,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
           <div className="mt-8 border-t border-white/10 pt-5">
             <p className="font-bold">
-              {review.customer_name || "Client"}
+              {review.customer_name || t.reviews_client}
             </p>
 
             <p className="mt-1 text-xs uppercase tracking-[0.2em] text-white/30">
-              Client Chelba Coif
+              {t.reviews_client_of}
             </p>
           </div>
         </motion.article>
@@ -860,22 +932,22 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
         </div>
 
         <h3 className="mt-5 text-2xl font-black uppercase">
-          Merci pour votre avis !
+          {t.review_thanks}
         </h3>
 
         <p className="mt-3 text-sm text-white/40">
-          Votre avis sera vérifié avant d&apos;être publié sur le site.
+          {t.review_thanks_p}
         </p>
       </div>
     ) : (
       <>
         <div className="mb-7">
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/30">
-            Votre expérience
+            {t.review_tag}
           </p>
 
           <h3 className="mt-2 text-2xl font-black uppercase sm:text-3xl">
-            Laissez votre avis
+            {t.review_h}
           </h3>
         </div>
 
@@ -885,14 +957,14 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
         >
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
-              Votre nom
+              {t.review_name}
             </label>
 
             <input
               type="text"
               value={reviewName}
               onChange={(e) => setReviewName(e.target.value)}
-              placeholder="Ex. Ahmed"
+              placeholder={t.review_name_ph}
               required
               className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/40"
             />
@@ -900,7 +972,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
-              Votre note
+              {t.review_rating}
             </label>
 
             <select
@@ -910,23 +982,23 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               }
               className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none focus:border-white/40"
             >
-              <option value={5}>★★★★★ — Excellent</option>
-              <option value={4}>★★★★☆ — Très bien</option>
-              <option value={3}>★★★☆☆ — Bien</option>
-              <option value={2}>★★☆☆☆ — Moyen</option>
-              <option value={1}>★☆☆☆☆ — À améliorer</option>
+              <option value={5}>{t.rating_5}</option>
+              <option value={4}>{t.rating_4}</option>
+              <option value={3}>{t.rating_3}</option>
+              <option value={2}>{t.rating_2}</option>
+              <option value={1}>{t.rating_1}</option>
             </select>
           </div>
 
           <div className="lg:col-span-2">
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
-              Votre commentaire
+              {t.review_comment}
             </label>
 
             <textarea
               value={reviewComment}
               onChange={(e) => setReviewComment(e.target.value)}
-              placeholder="Partagez votre expérience chez Chelba Coif..."
+              placeholder={t.review_comment_ph}
               rows={5}
               minLength={5}
               maxLength={1000}
@@ -946,15 +1018,14 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               className="inline-flex w-full items-center justify-center gap-3 rounded-xl bg-white px-6 py-4 text-sm font-black text-black transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-30"
             >
               {reviewSubmitting
-                ? "ENVOI EN COURS..."
-                : "PUBLIER MON AVIS"}
+                ? t.review_sending
+                : t.review_submit}
 
               <ArrowUpRight size={18} />
             </button>
 
             <p className="mt-3 text-center text-xs text-white/25">
-              Votre avis sera publié après validation par Chelba Coif.
-              Seul le nom que vous indiquez sera affiché publiquement.
+              {t.review_note}
             </p>
           </div>
         </form>
@@ -971,23 +1042,22 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
           <div className="relative">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-black/40">
-              Votre prochain look
+              {t.cta_tag}
             </p>
 
             <h2 className="mx-auto mt-5 max-w-3xl text-4xl font-black uppercase leading-[0.95] tracking-tight sm:text-7xl">
-              Prêt pour une coupe ?
+              {t.cta_h}
             </h2>
 
             <p className="mx-auto mt-6 max-w-lg text-sm leading-7 text-black/50">
-              Choisissez votre prestation et votre créneau. Simple, rapide
-              et sans complication.
+              {t.cta_p}
             </p>
 
             <button
               onClick={() => openBooking()}
               className="mt-8 inline-flex items-center gap-3 rounded-full bg-black px-8 py-4 text-sm font-bold text-white transition hover:scale-105"
             >
-              RÉSERVER MAINTENANT
+              {t.cta_btn}
               <ArrowUpRight size={18} />
             </button>
           </div>
@@ -1012,8 +1082,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               </p>
 
               <p className="mt-4 max-w-xs text-sm leading-7 text-white/35">
-                Barber shop moderne à Djerba. Coupes précises, style
-                personnalisé.
+                {t.footer_p}
               </p>
               <div className="mt-6 flex items-center gap-3">
   {safeHttpUrl(settings.instagram) && (
@@ -1056,7 +1125,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
             <div>
               <p className="mb-5 text-xs font-bold uppercase tracking-[0.25em] text-white/30">
-                Contact
+                {t.footer_contact}
               </p>
 
               <div className="space-y-4 text-sm text-white/55">
@@ -1066,13 +1135,13 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
   className="flex items-center gap-3 transition hover:text-white"
 >
   <Phone size={17} />
-  {settings.phone || "Téléphone non renseigné"}
+  {settings.phone || t.footer_phone_missing}
 </a>
 
                 {/* LOCATION */}
                 <div className="flex items-center gap-3">
                   <MapPin size={17} />
-                  {settings.address || "Adresse non renseignée"}
+                  {settings.address || t.footer_address_missing}
                 </div>
 
                 {/* GOOGLE MAPS */}
@@ -1083,7 +1152,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                   className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white hover:text-black"
                 >
                   <MapPin size={17} />
-                  Voir l&apos;itinéraire
+                  {t.footer_directions}
                   <ArrowUpRight size={16} />
                 </a>
                   <div className="mt-6 text-center">
@@ -1091,7 +1160,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
       href="/admin"
       className="text-xs text-white/30 transition hover:text-white/60"
     >
-      Administration
+      {t.footer_admin}
     </a>
   </div>
               </div>
@@ -1099,7 +1168,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
             <div>
               <p className="mb-5 text-xs font-bold uppercase tracking-[0.25em] text-white/30">
-                Horaires
+                {t.footer_hours}
               </p>
 
               <div className="space-y-4 text-sm text-white/55">
@@ -1112,7 +1181,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
       return (
         <div key={key} className={day ? "" : "text-white/40"}>
-          {DAY_NAMES_FR[key]} : {formatDayHours(day)}
+          {t.days[key]} : {day ? formatDayHours(day) : t.closed}
         </div>
       );
     })}
@@ -1123,7 +1192,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
           </div>
 
           <div className="mt-16 border-t border-white/10 pt-6 text-xs text-white/25">
-            © 2026 Chelba Coif — Tous droits réservés.
+            © {new Date().getFullYear()} Chelba Coif — {t.footer_rights}
           </div>
         </div>
       </footer>
@@ -1131,7 +1200,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
       <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 sm:bottom-6 sm:right-6 sm:gap-3">
         <a
           href={`tel:${settings.phone}`}
-          aria-label="Appeler Chelba Coif"
+          aria-label={t.call_aria}
           className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/80 text-white shadow-2xl backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:bg-white hover:text-black active:scale-95"
         >
           <Phone size={20} />
@@ -1141,7 +1210,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
           href={`https://wa.me/${settings.whatsapp.replace(/\D/g, "")}`}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Contacter Chelba Coif sur WhatsApp"
+          aria-label={t.whatsapp_aria}
           className="flex h-13 w-13 items-center justify-center rounded-full bg-white text-black shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:scale-105 hover:shadow-white/10 active:scale-95"
         >
           <MessageCircle size={25} />
@@ -1174,17 +1243,17 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     </p>
 
                     <h2 className="mt-2 text-3xl font-black uppercase sm:text-4xl">
-                      Réserver
+                      {t.modal_h}
                     </h2>
 
                     <p className="mt-2 text-sm text-white/40">
-                      Réservez votre prochain rendez-vous en quelques secondes.
+                      {t.modal_p}
                     </p>
                   </div>
 
                   <button
                     onClick={closeBooking}
-                    aria-label="Fermer"
+                    aria-label={t.close}
                     className="rounded-full border border-white/10 p-2.5 transition hover:bg-white/10"
                   >
                     <X size={18} />
@@ -1204,52 +1273,51 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                   </p>
 
                   <h3 className="mt-2 text-3xl font-black uppercase">
-                    Rendez-vous demandé
+                    {t.confirmed_h}
                   </h3>
 
                   <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-white/40">
-                    Votre demande a bien été préparée. Une confirmation devra
-                    être faite par le salon.
+                    {t.confirmed_p}
                   </p>
 
-                  <div className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-[#0d0d0d] text-left">
+                  <div className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-[#0d0d0d] text-start">
                     <div className="border-b border-white/10 px-5 py-4">
                       <p className="text-xs font-bold uppercase tracking-[0.2em] text-white/30">
-                        Votre réservation
+                        {t.confirmed_box}
                       </p>
                     </div>
 
                     <div className="space-y-4 p-5 text-sm">
                       <div className="flex items-center justify-between gap-4">
-                        <span className="text-white/35">Prestation</span>
+                        <span className="text-white/35">{t.sum_service}</span>
 
-                        <span className="text-right font-semibold">
+                        <span className="text-end font-semibold">
                           {form.service}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between gap-4">
-                        <span className="text-white/35">Date</span>
+                        <span className="text-white/35">{t.sum_date}</span>
 
-                        <span className="font-semibold">{form.date}</span>
+                        <span className="font-semibold">{formatLongDate(form.date)}</span>
                       </div>
 
                       <div className="flex items-center justify-between gap-4">
-                        <span className="text-white/35">Heure</span>
+                        <span className="text-white/35">{t.sum_time}</span>
 
                         <span className="font-semibold">{form.time}</span>
                       </div>
 
                       <div className="flex items-center justify-between gap-4">
-                        <span className="text-white/35">Client</span>
+                        <span className="text-white/35">{t.sum_client}</span>
 
-                        <span className="text-right font-semibold">
+                        <span className="text-end font-semibold">
                           {form.name}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between gap-4">
-                        <span className="text-white/35">Prix</span>
+                        <span className="text-white/35">{t.sum_price}</span>
 
                         <span className="font-black">
                           {selectedService?.price}
@@ -1262,7 +1330,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     onClick={closeBooking}
                     className="mt-6 w-full rounded-xl bg-white py-4 text-sm font-black text-black transition hover:scale-[1.02] hover:bg-white/90"
                   >
-                    TERMINER
+                    {t.finish}
                   </button>
                 </div>
               ) : (
@@ -1279,11 +1347,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30">
-                          Première étape
+                          {t.step1_tag}
                         </p>
 
                         <h3 className="mt-1 text-lg font-bold">
-                          Choisissez votre prestation
+                          {t.step1_h}
                         </h3>
                       </div>
                     </div>
@@ -1324,19 +1392,19 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                                   }`}
                                 >
                                   <Clock size={13} />
-                                  {service.duration} min
+                                  {service.duration} {t.minutes}
                                 </div>
                               </div>
 
                               <span className="font-black">
-                                {service.price} DT
+                                {service.price} {t.currency}
                               </span>
                             </div>
 
                             {selected && (
                               <div className="mt-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
                                 <Check size={14} />
-                                Sélectionné
+                                {t.selected}
                               </div>
                             )}
                           </button>
@@ -1354,11 +1422,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30">
-                          Deuxième étape
+                          {t.step2_tag}
                         </p>
 
                         <h3 className="mt-1 text-lg font-bold">
-                          Choisissez votre créneau
+                          {t.step2_h}
                         </h3>
                       </div>
                     </div>
@@ -1367,13 +1435,13 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                       {/* DATE */}
                       <div>
                         <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
-                          Date
+                          {t.date}
                         </label>
 
                         <div className="relative">
                           <CalendarDays
                             size={17}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 rtl:left-auto rtl:right-4"
                           />
 
                           <input
@@ -1390,23 +1458,21 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                               });
                             }}
                             required
-                            className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 pl-11 text-sm text-white outline-none transition focus:border-white/40"
+                            className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 pl-11 text-sm text-white rtl:pl-4 rtl:pr-11 outline-none transition focus:border-white/40"
                           />
                         </div>
 
                         {dayClosed && (
                           <p className="mt-2 text-xs font-semibold text-white/40">
-                            {closure
-                              ? `Le salon est fermé${
-                                  closure.reason ? ` : ${closure.reason}` : " ce jour-là"
-                                }.`
-                              : "Le salon est fermé ce jour-là."}
+                            {closure?.reason
+                              ? fill(t.closed_reason, { reason: closure.reason })
+                              : t.closed_day}
                           </p>
                         )}
 
                         {form.date && !dayClosed && daySchedule && (
                           <p className="mt-2 text-xs text-white/25">
-                            {DAY_NAMES_FR[String(new Date(`${form.date}T12:00:00`).getDay())]}{" "}
+                            {t.days[String(new Date(`${form.date}T12:00:00`).getDay())]}{" "}
                             : {formatDayHours(daySchedule)}
                           </p>
                         )}
@@ -1415,13 +1481,13 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                       {/* TIME */}
                       <div>
                         <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
-                          Heure
+                          {t.time}
                         </label>
 
                         <div className="relative">
                           <Clock
                             size={17}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30"
+                            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 rtl:left-auto rtl:right-4"
                           />
 
 <select
@@ -1434,16 +1500,16 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
     })
   }
   required
-  className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 pl-11 text-sm text-white outline-none transition focus:border-white/40"
+  className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 pl-11 text-sm text-white rtl:pl-4 rtl:pr-11 outline-none transition focus:border-white/40"
 >
   <option value="">
     {!form.date
-      ? "Choisissez d'abord une date"
+      ? t.time_pick_date_first
       : dayClosed
-      ? "Salon fermé"
+      ? t.time_closed
       : availableTimeSlots.length === 0
-      ? "Aucun créneau disponible"
-      : "Choisir une heure"}
+      ? t.time_none
+      : t.time_pick}
   </option>
 
   {availableTimeSlots.map((time) => (
@@ -1456,7 +1522,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
                         {form.date && !dayClosed && selectedService && (
                           <p className="mt-2 text-xs text-white/25">
-                            Durée : {serviceDuration} min
+                            {t.duration} : {serviceDuration} {t.minutes}
                           </p>
                         )}
                       </div>
@@ -1472,11 +1538,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30">
-                          Dernière étape
+                          {t.step3_tag}
                         </p>
 
                         <h3 className="mt-1 text-lg font-bold">
-                          Vos informations
+                          {t.step3_h}
                         </h3>
                       </div>
                     </div>
@@ -1484,12 +1550,12 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     <div className="space-y-4">
                       <div>
                         <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
-                          Nom complet
+                          {t.full_name}
                         </label>
 
                         <input
                           type="text"
-                          placeholder="Ex. Ahmed Ben Ali"
+                          placeholder={t.full_name_ph}
                           autoComplete="name"
                           maxLength={NAME_MAX_LENGTH}
                           value={form.name}
@@ -1506,17 +1572,17 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
                       <div>
                         <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-white/40">
-                          Numéro de téléphone
+                          {t.phone}
                         </label>
 
                         <input
                           type="tel"
-                          placeholder="+216 XX XXX XXX"
+                          placeholder={t.phone_ph}
                           autoComplete="tel"
                           inputMode="tel"
                           maxLength={20}
                           pattern="\+?[0-9 .-]{8,20}"
-                          title="8 à 20 chiffres, ex. +216 50 882 529"
+                          title={t.phone_title}
                           value={form.phone}
                           onChange={(e) =>
                             setForm({
@@ -1550,7 +1616,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30">
-                                Récapitulatif
+                                {t.summary}
                               </p>
 
                               <p className="mt-2 font-bold">
@@ -1566,7 +1632,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                           <div className="mt-4 grid gap-3 border-t border-white/10 pt-4 text-sm text-white/50 sm:grid-cols-2">
                             <div className="flex items-center gap-3">
                               <CalendarDays size={17} />
-                              <span>{form.date}</span>
+                              <span>{formatLongDate(form.date)}</span>
                             </div>
 
                             <div className="flex items-center gap-3">
@@ -1591,15 +1657,12 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     }
                     className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl bg-white py-4 text-sm font-black text-black shadow-xl transition hover:scale-[1.01] hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100"
                   >
-                    {submitting ? "ENVOI EN COURS..." : "CONFIRMER MON RENDEZ-VOUS"}
+                    {submitting ? t.submitting : t.submit_booking}
                     <ArrowUpRight size={18} />
                   </button>
 
                   <p className="mt-4 text-center text-xs leading-5 text-white/20">
-                    En confirmant, votre demande de rendez-vous sera
-                    préparée pour Chelba Coif. Votre nom et votre numéro
-                    servent uniquement à gérer ce rendez-vous et ne sont
-                    jamais partagés.
+                    {t.booking_note}
                   </p>
                 </form>
               )}

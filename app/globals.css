@@ -37,3 +37,17 @@ body {
     font-size: 16px;
   }
 }
+
+/*
+  Arabe (RTL) : l'écriture arabe est liée, un espacement des lettres la
+  rend illisible ; on neutralise le letter-spacing et on aère les titres.
+*/
+[dir="rtl"] * {
+  letter-spacing: 0 !important;
+}
+
+[dir="rtl"] h1,
+[dir="rtl"] h2,
+[dir="rtl"] h3 {
+  line-height: 1.15 !important;
+}
