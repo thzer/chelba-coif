@@ -6,6 +6,7 @@ import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { safeHttpUrl } from "@/lib/url";
 import {
+  type Barber,
   type WeekSchedule,
   DEFAULT_SCHEDULE,
   DEFAULT_SLOT_INTERVAL,
@@ -17,6 +18,7 @@ import { ClosuresEditor } from "@/components/admin/ClosuresEditor";
 import { AgendaView } from "@/components/admin/AgendaView";
 import { InsightsPanel } from "@/components/admin/InsightsPanel";
 import { SecurityPanel } from "@/components/admin/SecurityPanel";
+import { BarbersEditor } from "@/components/admin/BarbersEditor";
 import { SITE_URL } from "@/lib/site";
 import { type ClientMessageKind, clientMessages, whatsappUrl } from "@/lib/whatsapp";
 
@@ -35,12 +37,22 @@ type Appointment = {
   appointment_date: string;
   appointment_time: string;
   status: string;
+  barber_id: number | null;
   services: {
     name: string;
     duration: number | null;
     price: number;
   }[] | null;
+  barbers: { name: string }[] | null;
 };
+
+type ServiceRef = NonNullable<Appointment["services"]>[number];
+
+/** PostgREST renvoie un objet pour une relation *-vers-1 : on normalise en tableau. */
+function toArray<T>(value: T | T[] | null | undefined): T[] | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value : [value];
+}
 
 type Service = {
   id: number;
@@ -124,6 +136,9 @@ export default function AdminPage() {
   const [appointmentSearch, setAppointmentSearch] = useState("");
   const [appointmentFilter, setAppointmentFilter] = useState("all");
   const [appointmentDateFilter, setAppointmentDateFilter] = useState("");
+  const [appointmentBarberFilter, setAppointmentBarberFilter] = useState("all");
+  const [agendaBarberId, setAgendaBarberId] = useState<number | null>(null);
+  const [barbers, setBarbers] = useState<Barber[]>([]);
   const [appointmentView, setAppointmentView] = useState<"list" | "agenda">("list");
   const [agendaDate, setAgendaDate] = useState(() => {
     const now = new Date();
@@ -296,13 +311,18 @@ export default function AdminPage() {
         !appointmentDateFilter ||
         appointment.appointment_date === appointmentDateFilter;
 
-      return matchesSearch && matchesStatus && matchesDate;
+      const matchesBarber =
+        appointmentBarberFilter === "all" ||
+        String(appointment.barber_id ?? "") === appointmentBarberFilter;
+
+      return matchesSearch && matchesStatus && matchesDate && matchesBarber;
     });
   }, [
     appointments,
     appointmentSearch,
     appointmentFilter,
     appointmentDateFilter,
+    appointmentBarberFilter,
   ]);
 
   /* =========================
@@ -364,10 +384,14 @@ export default function AdminPage() {
         appointment_date,
         appointment_time,
         status,
+        barber_id,
         services (
           name,
           duration,
           price
+        ),
+        barbers (
+          name
         )
       `)
       .order("appointment_date", { ascending: true })
@@ -379,8 +403,32 @@ export default function AdminPage() {
       return;
     }
 
-    setAppointments((data as Appointment[]) ?? []);
+    setAppointments(
+      ((data ?? []) as unknown as Record<string, unknown>[]).map((row) => ({
+        ...(row as unknown as Appointment),
+        services: toArray(
+          row.services as ServiceRef | ServiceRef[] | null
+        ),
+        barbers: toArray(row.barbers as { name: string } | { name: string }[] | null),
+      }))
+    );
     setAppointmentsLoading(false);
+  }
+
+  async function loadBarbers() {
+    const { data, error } = await supabase
+      .from("barbers")
+      .select("id, name, active, sort_order")
+      .order("sort_order")
+      .order("id");
+
+    if (error) {
+      console.error("Error loading barbers:", error);
+      return;
+    }
+
+    setBarbers(data ?? []);
+    setAgendaBarberId((current) => current ?? data?.find((b) => b.active)?.id ?? null);
   }
 
   /* =========================
@@ -637,6 +685,7 @@ export default function AdminPage() {
             appointment_date: appointment.appointment_date,
             appointment_time: appointment.appointment_time,
             service: appointment.services?.[0]?.name,
+            barber: appointment.barbers?.[0]?.name,
             shopName: settings.shop_name,
           })
         );
@@ -1172,6 +1221,7 @@ export default function AdminPage() {
       loadGallery(),
       loadReviews(),
       loadSettings(),
+      loadBarbers(),
     ]);
   }
 
@@ -2060,8 +2110,30 @@ export default function AdminPage() {
                 </div>
 
                 {appointmentView === "agenda" && (
+                  <>
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      {barbers
+                        .filter((b) => b.active || b.id === agendaBarberId)
+                        .map((b) => (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={() => setAgendaBarberId(b.id)}
+                            className={`min-h-10 rounded-xl px-4 text-sm font-semibold transition ${
+                              agendaBarberId === b.id
+                                ? "bg-white text-black"
+                                : "border border-white/10 bg-white/[0.03] text-white/60 hover:bg-white/[0.08] hover:text-white"
+                            }`}
+                          >
+                            💈 {b.name}
+                          </button>
+                        ))}
+                    </div>
+
                   <AgendaView
-                    appointments={appointments}
+                    appointments={appointments.filter(
+                      (a) => a.barber_id === agendaBarberId || a.barber_id === null
+                    )}
                     schedule={settings.schedule}
                     interval={settings.slot_interval}
                     date={agendaDate}
@@ -2070,6 +2142,7 @@ export default function AdminPage() {
                     statusLabel={getStatusLabelStatic}
                     statusClass={getStatusClassStatic}
                   />
+                  </>
                 )}
 
                 {appointmentView === "list" && (<>
@@ -2194,6 +2267,19 @@ export default function AdminPage() {
                       </option>
                     </select>
 
+                    <select
+                      value={appointmentBarberFilter}
+                      onChange={(e) => setAppointmentBarberFilter(e.target.value)}
+                      className="rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white/70 outline-none"
+                    >
+                      <option value="all">Tous les coiffeurs</option>
+                      {barbers.map((b) => (
+                        <option key={b.id} value={String(b.id)}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
+
                     <input
                       type="date"
                       value={
@@ -2218,6 +2304,7 @@ export default function AdminPage() {
                         setAppointmentDateFilter(
                           ""
                         );
+                        setAppointmentBarberFilter("all");
                       }}
                       className="rounded-xl border border-white/10 px-4 py-3 text-xs text-white/40 transition hover:bg-white/10 hover:text-white"
                     >
@@ -3340,6 +3427,33 @@ export default function AdminPage() {
                       </div>
                     </div>
 
+                    {/* BARBERS */}
+
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                      <div className="border-b border-white/[0.07] p-5 sm:p-6">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
+                            💈
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold">Coiffeurs</h4>
+
+                            <p className="mt-0.5 text-xs text-white/30">
+                              Le client choisit son coiffeur à la
+                              réservation. Chaque coiffeur a son propre
+                              planning. Modifications enregistrées
+                              immédiatement.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 sm:p-6">
+                        <BarbersEditor barbers={barbers} onChange={loadBarbers} />
+                      </div>
+                    </div>
+
                     {/* SCHEDULE */}
 
                     <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
@@ -3801,6 +3915,7 @@ function AppointmentCard({
           appointment_date: appointment.appointment_date,
           appointment_time: appointment.appointment_time,
           service: service?.name,
+          barber: appointment.barbers?.[0]?.name,
         })
       : undefined
   );
@@ -3814,6 +3929,7 @@ function AppointmentCard({
             appointment_date: appointment.appointment_date,
             appointment_time: appointment.appointment_time,
             service: service?.name,
+            barber: appointment.barbers?.[0]?.name,
           })
         )
       : null;
@@ -3878,6 +3994,13 @@ function AppointmentCard({
                     5
                   )}
                 />
+
+                {appointment.barbers?.[0] && (
+                  <InfoPill
+                    icon="💈"
+                    text={appointment.barbers[0].name}
+                  />
+                )}
 
                 {service && (
                   <InfoPill

@@ -6,7 +6,7 @@ avec une interface d'administration.
 - **Site public** (`/`) : services, galerie, avis clients, réservation d'un
   créneau avec envoi du récapitulatif sur WhatsApp. Disponible en
   **français, anglais et arabe** (sélecteur dans l'en-tête, RTL pour l'arabe).
-- **Administration** (`/admin`) : rendez-vous (liste + agenda du jour,
+- **Administration** (`/admin`) : rendez-vous (liste + agenda du jour par coiffeur,
   messages WhatsApp pré-remplis vers le client), statistiques, services (avec
   upload d'images), galerie, modération des avis, horaires d'ouverture et
   fermetures exceptionnelles, sécurité du compte (2FA), mot de passe oublié.
@@ -52,7 +52,7 @@ repose sur le Row Level Security**. Après création du projet Supabase :
    ```
 
 Tables : `appointments`, `services`, `gallery`, `reviews`, `settings`
-(dont `schedule` / `slot_interval`), `closures`, `admin_users`. Bucket Storage public : `gallery` (images de la galerie et des
+(dont `schedule` / `slot_interval`), `closures`, `barbers`, `admin_users`. Bucket Storage public : `gallery` (images de la galerie et des
 services).
 
 ## Changement de nom de domaine
@@ -63,6 +63,10 @@ suivent automatiquement.
 
 ## Points à connaître
 
+- Plusieurs coiffeurs : le client choisit le sien (ou « Sans préférence » →
+  premier disponible). Chaque coiffeur a son propre planning ; un créneau
+  est unique par coiffeur. Gestion dans *Admin → Paramètres → Coiffeurs*.
+  Les horaires sont communs à tous les coiffeurs.
 - Les horaires, la pause, l'intervalle des créneaux et les fermetures
   exceptionnelles se règlent dans *Admin → Paramètres*. Les créneaux proposés
   tiennent compte de la durée réelle de chaque service.

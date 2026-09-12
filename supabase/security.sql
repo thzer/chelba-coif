@@ -147,6 +147,11 @@ revoke all on function public.get_booked_slots(date) from public;
 grant execute on function public.get_booked_slots(date) to anon, authenticated;
 
 -- -----------------------------------------------------------------------------
+-- 2b. barbers — voir migration `add_barbers` (table, RLS, appointments.barber_id,
+--     index unique par barbier, RPC get_booked_slots par barbier)
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
 -- 3. services / gallery / reviews / settings
 -- -----------------------------------------------------------------------------
 alter table public.services enable row level security;

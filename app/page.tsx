@@ -15,6 +15,7 @@ import {
 import Image from "next/image";
 import { SmartImage } from "@/components/SmartImage";
 import {
+  type Barber,
   type BookedSlot,
   type Closure,
   type WeekSchedule,
@@ -25,6 +26,7 @@ import {
   findClosure,
   formatDayHours,
   getDaySchedule,
+  slotsForBarber,
   toDateString,
 } from "@/lib/schedule";
 import { motion, AnimatePresence } from "framer-motion";
@@ -243,9 +245,27 @@ async function loadClosures() {
 }, []);
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [assignedBarber, setAssignedBarber] = useState("");
 
+  const [barbers, setBarbers] = useState<Barber[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from("barbers")
+      .select("id, name, active, sort_order")
+      .eq("active", true)
+      .order("sort_order")
+      .order("id")
+      .then(({ data, error }) => {
+        if (error) console.error("Error loading barbers:", error);
+        setBarbers(data ?? []);
+      });
+  }, []);
+
+  // barber : "" (pas encore choisi), "any" (sans préférence) ou l'id.
   const [form, setForm] = useState({
     service: "",
+    barber: "",
     date: "",
     time: "",
     name: "",
@@ -276,6 +296,7 @@ async function loadClosures() {
 
       setBookedAppointments(
         ((data as BookedSlot[] | null) ?? []).map((slot) => ({
+          barber_id: slot.barber_id,
           appointment_time: slot.appointment_time.slice(0, 5),
           duration: slot.duration,
         }))
@@ -311,6 +332,7 @@ async function loadClosures() {
   if (
     submitting ||
     !form.service ||
+    !form.barber ||
     !form.date ||
     !form.time ||
     !customerName ||
@@ -346,22 +368,29 @@ async function loadClosures() {
 
   setSubmitting(true);
 
-  const { data: existingAppointments, error: existingError } = await supabase
-    .from("appointments")
-    .select("id")
-    .eq("appointment_date", form.date)
-    .eq("appointment_time", form.time)
-    .in("status", ["pending", "confirmed"])
-    .limit(1);
+  // Re-vérifie les créneaux à l'instant T (quelqu'un a pu réserver entre-temps)
+  // et attribue le barbier.
+  const { data: freshData, error: freshError } = await supabase.rpc(
+    "get_booked_slots",
+    { target_date: form.date }
+  );
 
-  if (existingError) {
-    console.error("Error checking appointment:", existingError);
+  if (freshError) {
+    console.error("Error checking slots:", freshError);
     alert(t.alert_slot_check);
     setSubmitting(false);
     return;
   }
 
-  if (existingAppointments && existingAppointments.length > 0) {
+  const fresh = ((freshData as BookedSlot[] | null) ?? []).map((slot) => ({
+    ...slot,
+    appointment_time: slot.appointment_time.slice(0, 5),
+  }));
+  setBookedAppointments(fresh);
+
+  const barber = pickBarber(form.time, fresh);
+
+  if (!barber) {
     alert(t.alert_slot_taken);
     setForm((prev) => ({ ...prev, time: "" }));
     setSubmitting(false);
@@ -372,6 +401,7 @@ async function loadClosures() {
     customer_name: customerName,
     phone: customerPhone,
     service_id: selectedService.id,
+    barber_id: barber.id,
     appointment_date: form.date,
     appointment_time: form.time,
     status: "pending",
@@ -395,6 +425,7 @@ async function loadClosures() {
   const message = `🔔 NOUVELLE RÉSERVATION — CHELBA COIF
 
 ✂️ Prestation : ${form.service}
+💈 Coiffeur : ${barber.name}
 📅 Date : ${form.date}
 🕐 Heure : ${form.time}
 
@@ -408,6 +439,7 @@ async function loadClosures() {
 
   window.open(whatsappUrl, "_blank");
 
+  setAssignedBarber(barber.name);
   setConfirmed(true);
 }
 
@@ -430,15 +462,38 @@ async function loadClosures() {
   const closure = form.date ? findClosure(closures, form.date) : null;
   const dayClosed = Boolean(form.date) && (!daySchedule || Boolean(closure));
 
-  const availableTimeSlots = computeAvailableSlots({
-    schedule: settings.schedule,
-    closures,
-    date: form.date,
-    interval: settings.slot_interval,
-    serviceDuration,
-    booked: bookedAppointments,
-    now,
-  });
+  /** Créneaux libres d'un barbier donné. */
+  function slotsFor(barberId: number, booked: BookedSlot[] = bookedAppointments) {
+    return computeAvailableSlots({
+      schedule: settings.schedule,
+      closures,
+      date: form.date,
+      interval: settings.slot_interval,
+      serviceDuration,
+      booked: slotsForBarber(booked, barberId),
+      now,
+    });
+  }
+
+  const selectedBarber =
+    form.barber && form.barber !== "any"
+      ? barbers.find((b) => String(b.id) === form.barber) ?? null
+      : null;
+
+  // "Sans préférence" : union des créneaux de tous les barbiers.
+  const availableTimeSlots = !form.barber
+    ? []
+    : selectedBarber
+    ? slotsFor(selectedBarber.id)
+    : [...new Set(barbers.flatMap((b) => slotsFor(b.id)))].sort();
+
+  /** Barbier à qui attribuer un créneau (le choisi, ou le premier libre). */
+  function pickBarber(time: string, booked: BookedSlot[] = bookedAppointments) {
+    if (selectedBarber) {
+      return slotsFor(selectedBarber.id, booked).includes(time) ? selectedBarber : null;
+    }
+    return barbers.find((b) => slotsFor(b.id, booked).includes(time)) ?? null;
+  }
 
   async function handleReviewSubmit(e: React.FormEvent) {
   e.preventDefault();
@@ -1309,6 +1364,14 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                       </div>
 
                       <div className="flex items-center justify-between gap-4">
+                        <span className="text-white/35">{t.sum_barber}</span>
+
+                        <span className="text-end font-semibold">
+                          {assignedBarber}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4">
                         <span className="text-white/35">{t.sum_client}</span>
 
                         <span className="text-end font-semibold">
@@ -1413,11 +1476,80 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     </div>
                   </div>
 
-                  {/* STEP 02 */}
+                  {/* STEP 02 — BARBER */}
                   <div className="mt-9">
                     <div className="mb-5 flex items-center gap-3">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-black">
                         02
+                      </span>
+
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30">
+                          {t.step_barber_tag}
+                        </p>
+
+                        <h3 className="mt-1 text-lg font-bold">
+                          {t.step_barber_h}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {[
+                        ...barbers.map((b) => ({ value: String(b.id), label: b.name, hint: "" })),
+                        { value: "any", label: t.any_barber, hint: t.any_barber_hint },
+                      ].map((option) => {
+                        const selected = form.barber === option.value;
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() =>
+                              setForm({ ...form, barber: option.value, time: "" })
+                            }
+                            className={`rounded-2xl border p-4 text-start transition ${
+                              selected
+                                ? "border-white bg-white text-black shadow-lg"
+                                : "border-white/10 bg-[#0d0d0d] hover:border-white/25 hover:bg-[#111111]"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span
+                                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-black ${
+                                  selected ? "bg-black text-white" : "bg-white/10 text-white"
+                                }`}
+                              >
+                                {option.value === "any" ? "✦" : option.label.charAt(0).toUpperCase()}
+                              </span>
+
+                              <div className="min-w-0">
+                                <p className="truncate font-bold">{option.label}</p>
+                                {option.hint && (
+                                  <p className={`mt-0.5 text-xs ${selected ? "text-black/50" : "text-white/30"}`}>
+                                    {option.hint}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {selected && (
+                              <div className="mt-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                                <Check size={14} />
+                                {t.selected}
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* STEP 03 — SLOT */}
+                  <div className="mt-9">
+                    <div className="mb-5 flex items-center gap-3">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-black">
+                        03
                       </span>
 
                       <div>
@@ -1492,7 +1624,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
 <select
   value={form.time}
-  disabled={!form.date || dayClosed}
+  disabled={!form.date || dayClosed || !form.barber}
   onChange={(e) =>
     setForm({
       ...form,
@@ -1503,7 +1635,9 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
   className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 pl-11 text-sm text-white rtl:pl-4 rtl:pr-11 outline-none transition focus:border-white/40"
 >
   <option value="">
-    {!form.date
+    {!form.barber
+      ? t.time_pick_barber_first
+      : !form.date
       ? t.time_pick_date_first
       : dayClosed
       ? t.time_closed
@@ -1529,11 +1663,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     </div>
                   </div>
 
-                  {/* STEP 03 */}
+                  {/* STEP 04 — DETAILS */}
                   <div className="mt-9">
                     <div className="mb-5 flex items-center gap-3">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-xs font-black text-black">
-                        03
+                        04
                       </span>
 
                       <div>
@@ -1639,6 +1773,13 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                               <Clock size={17} />
                               <span>{form.time}</span>
                             </div>
+
+                            <div className="flex items-center gap-3 sm:col-span-2">
+                              <Scissors size={17} />
+                              <span>
+                                {selectedBarber ? selectedBarber.name : t.any_barber}
+                              </span>
+                            </div>
                           </div>
                         </motion.div>
                       )}
@@ -1650,6 +1791,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                     disabled={
                       submitting ||
                       !form.service ||
+                      !form.barber ||
                       !form.date ||
                       !form.time ||
                       !form.name.trim() ||

@@ -11,6 +11,7 @@ type AppointmentInfo = {
   appointment_date: string; // YYYY-MM-DD
   appointment_time: string; // HH:MM(:SS)
   service?: string | null;
+  barber?: string | null;
   shopName?: string;
 };
 
@@ -34,14 +35,14 @@ export const clientMessages = {
     } est confirmé ✅\n\n📅 ${formatDate(a.appointment_date)}\n🕐 ${a.appointment_time.slice(
       0,
       5
-    )}${a.service ? `\n✂️ ${a.service}` : ""}\n\nÀ bientôt !`,
+    )}${a.service ? `\n✂️ ${a.service}` : ""}${a.barber ? `\n💈 ${a.barber}` : ""}\n\nÀ bientôt !`,
 
   reminder: (a: AppointmentInfo) =>
     `Bonjour ${firstName(a.customer_name)} 👋\n\nPetit rappel : votre rendez-vous chez ${
       a.shopName ?? "Chelba Coif"
     } est ${formatDate(a.appointment_date)} à ${a.appointment_time.slice(0, 5)}${
       a.service ? ` (${a.service})` : ""
-    }.\n\nÀ tout à l'heure !`,
+    }${a.barber ? ` avec ${a.barber}` : ""}.\n\nÀ tout à l'heure !`,
 
   cancelled: (a: AppointmentInfo) =>
     `Bonjour ${firstName(a.customer_name)},\n\nNous sommes désolés, votre rendez-vous du ${formatDate(

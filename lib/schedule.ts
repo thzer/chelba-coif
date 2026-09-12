@@ -23,7 +23,18 @@ export type Closure = {
   reason: string | null;
 };
 
-export type BookedSlot = { appointment_time: string; duration: number };
+export type BookedSlot = {
+  barber_id: number | null;
+  appointment_time: string;
+  duration: number;
+};
+
+export type Barber = { id: number; name: string; active: boolean; sort_order: number };
+
+/** Créneaux d'un barbier précis (les RDV sans barbier bloquent tout le monde). */
+export function slotsForBarber(booked: BookedSlot[], barberId: number) {
+  return booked.filter((b) => b.barber_id === barberId || b.barber_id === null);
+}
 
 const DEFAULT_DAY: DaySchedule = {
   open: "09:00",
