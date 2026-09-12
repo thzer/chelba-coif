@@ -4,9 +4,12 @@ Site vitrine et prise de rendez-vous pour le barber shop Chelba Coif (Djerba),
 avec une interface d'administration.
 
 - **Site public** (`/`) : services, galerie, avis clients, réservation d'un
-  créneau avec envoi du récapitulatif sur WhatsApp.
-- **Administration** (`/admin`) : gestion des rendez-vous, services (avec
-  upload d'images), galerie, modération des avis, paramètres du salon.
+  créneau avec envoi du récapitulatif sur WhatsApp. Disponible en
+  **français, anglais et arabe** (sélecteur dans l'en-tête, RTL pour l'arabe).
+- **Administration** (`/admin`) : rendez-vous (liste + agenda du jour,
+  messages WhatsApp pré-remplis vers le client), statistiques, services (avec
+  upload d'images), galerie, modération des avis, horaires d'ouverture et
+  fermetures exceptionnelles, sécurité du compte (2FA), mot de passe oublié.
 
 Stack : Next.js 16 (App Router), React 19, Tailwind CSS 4, Supabase
 (Postgres + Auth + Storage), déployé sur Vercel.
@@ -35,7 +38,12 @@ repose sur le Row Level Security**. Après création du projet Supabase :
 1. Exécuter [`supabase/security.sql`](supabase/security.sql) dans
    *SQL Editor* (idempotent, ré-exécutable).
 2. *Authentication → Providers → Email* : désactiver **Allow new users to sign up**.
-3. Créer l'utilisateur admin dans *Authentication → Users*, puis l'autoriser :
+   Recommandé : *Minimum password length* = 12.
+3. *Authentication → URL Configuration* : ajouter aux **Redirect URLs**
+   `https://<votre-domaine>/admin/reset-password` (et
+   `http://localhost:3000/admin/reset-password` pour le développement),
+   sinon le lien « Mot de passe oublié » ne fonctionnera pas.
+4. Créer l'utilisateur admin dans *Authentication → Users*, puis l'autoriser :
 
    ```sql
    insert into public.admin_users (id, email)
@@ -43,8 +51,8 @@ repose sur le Row Level Security**. Après création du projet Supabase :
    on conflict do nothing;
    ```
 
-Tables : `appointments`, `services`, `gallery`, `reviews`, `settings`,
-`admin_users`. Bucket Storage public : `gallery` (images de la galerie et des
+Tables : `appointments`, `services`, `gallery`, `reviews`, `settings`
+(dont `schedule` / `slot_interval`), `closures`, `admin_users`. Bucket Storage public : `gallery` (images de la galerie et des
 services).
 
 ## Changement de nom de domaine
@@ -53,16 +61,22 @@ Mettre à jour `NEXT_PUBLIC_SITE_URL` dans Vercel (*Settings → Environment
 Variables*) puis redéployer. Métadonnées, `sitemap.xml` et `robots.txt`
 suivent automatiquement.
 
-## Points à connaître (logique métier dans le code)
+## Points à connaître
 
-- Les horaires réservables sont définis dans `app/page.tsx` (fermé le
-  mercredi, samedi jusqu'à 20h, pause 12h30–14h). Le champ « Horaires » de
-  l'admin ne change que le texte affiché.
+- Les horaires, la pause, l'intervalle des créneaux et les fermetures
+  exceptionnelles se règlent dans *Admin → Paramètres*. Les créneaux proposés
+  tiennent compte de la durée réelle de chaque service.
 - Une réservation est enregistrée « en attente » puis WhatsApp s'ouvre
-  pré-rempli. Aucune notification automatique n'est envoyée au salon : les
-  demandes se consultent dans l'admin.
-- Pas de « mot de passe oublié » dans l'admin : réinitialiser depuis
-  *Supabase → Authentication → Users*.
+  pré-rempli côté client. Aucune notification automatique n'est envoyée au
+  salon : les demandes se consultent dans l'admin. Confirmer ou annuler un
+  RDV ouvre WhatsApp avec un message prêt pour le client.
+- Double authentification (application TOTP) activable dans *Admin →
+  Paramètres → Sécurité*. Une fois activée, `is_admin()` exige une session
+  validée par un code : la protection est appliquée par la base, pas
+  seulement par l'interface. En cas de perte du téléphone : supprimer le
+  facteur dans *Supabase → Authentication → Users → MFA*.
+- Traductions du site public : `lib/i18n.ts`. L'administration reste en
+  français.
 
 ## Scripts
 
