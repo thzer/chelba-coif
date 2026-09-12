@@ -38,8 +38,8 @@ repose sur le Row Level Security**. Après création du projet Supabase :
 3. Créer l'utilisateur admin dans *Authentication → Users*, puis l'autoriser :
 
    ```sql
-   insert into public.admin_users (id)
-   select id from auth.users where email = 'admin@exemple.com'
+   insert into public.admin_users (id, email)
+   select id, email from auth.users where email = 'admin@exemple.com'
    on conflict do nothing;
    ```
 

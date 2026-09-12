@@ -179,7 +179,7 @@ async function loadSettings() {
           ((rpcData as { appointment_time: string }[] | null) ?? []).map(
             (slot) => ({
               appointment_date: form.date,
-              appointment_time: slot.appointment_time,
+              appointment_time: slot.appointment_time.slice(0, 5),
             })
           )
         );
@@ -199,7 +199,14 @@ async function loadSettings() {
         return;
       }
 
-      setBookedAppointments(data ?? []);
+      // La colonne est de type `time` : Postgres renvoie "09:00:00",
+      // le front travaille en "09:00".
+      setBookedAppointments(
+        (data ?? []).map((appointment) => ({
+          ...appointment,
+          appointment_time: appointment.appointment_time.slice(0, 5),
+        }))
+      );
     }
 
     loadBookedAppointments();
