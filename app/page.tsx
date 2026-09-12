@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { safeHttpUrl } from "@/lib/url";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -17,6 +18,13 @@ import {
   X,
 } from "lucide-react";
 
+
+const NAME_MAX_LENGTH = 80;
+const PHONE_PATTERN = /^\+?[0-9 .-]{8,20}$/;
+
+function isValidPhone(value: string) {
+  return PHONE_PATTERN.test(value.trim());
+}
 
 export default function Home() {
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -139,6 +147,7 @@ async function loadSettings() {
   loadSettings();
 }, []);
   const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     service: "",
@@ -159,6 +168,25 @@ async function loadSettings() {
         return;
       }
 
+      // RPC sécurisée : ne renvoie que les heures, jamais les noms/téléphones.
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        "get_booked_slots",
+        { target_date: form.date }
+      );
+
+      if (!rpcError) {
+        setBookedAppointments(
+          ((rpcData as { appointment_time: string }[] | null) ?? []).map(
+            (slot) => ({
+              appointment_date: form.date,
+              appointment_time: slot.appointment_time,
+            })
+          )
+        );
+        return;
+      }
+
+      // Fallback tant que supabase/security.sql n'est pas appliqué.
       const { data, error } = await supabase
         .from("appointments")
         .select("appointment_date, appointment_time")
@@ -197,13 +225,33 @@ async function loadSettings() {
  async function handleSubmit(e: React.FormEvent) {
   e.preventDefault();
 
+  const customerName = form.name.trim();
+  const customerPhone = form.phone.trim();
+
   if (
+    submitting ||
     !form.service ||
     !form.date ||
     !form.time ||
-    !form.name ||
-    !form.phone
+    !customerName ||
+    !customerPhone
   ) {
+    return;
+  }
+
+  if (customerName.length > NAME_MAX_LENGTH) {
+    alert(`Le nom ne doit pas dépasser ${NAME_MAX_LENGTH} caractères.`);
+    return;
+  }
+
+  if (!isValidPhone(customerPhone)) {
+    alert("Veuillez saisir un numéro de téléphone valide.");
+    return;
+  }
+
+  if (form.date < today || !availableTimeSlots.includes(form.time)) {
+    alert("Ce créneau n'est plus disponible. Veuillez en choisir un autre.");
+    setForm((prev) => ({ ...prev, time: "" }));
     return;
   }
 
@@ -216,6 +264,8 @@ async function loadSettings() {
     return;
   }
 
+  setSubmitting(true);
+
   const { data: existingAppointments, error: existingError } = await supabase
     .from("appointments")
     .select("id")
@@ -227,23 +277,27 @@ async function loadSettings() {
   if (existingError) {
     console.error("Error checking appointment:", existingError);
     alert("Impossible de vérifier ce créneau. Veuillez réessayer.");
+    setSubmitting(false);
     return;
   }
 
   if (existingAppointments && existingAppointments.length > 0) {
     alert("Ce créneau vient d'être réservé. Veuillez choisir une autre heure.");
     setForm((prev) => ({ ...prev, time: "" }));
+    setSubmitting(false);
     return;
   }
 
   const { error } = await supabase.from("appointments").insert({
-    customer_name: form.name,
-    phone: form.phone,
+    customer_name: customerName,
+    phone: customerPhone,
     service_id: selectedService.id,
     appointment_date: form.date,
     appointment_time: form.time,
     status: "pending",
   });
+
+  setSubmitting(false);
 
   if (error) {
     console.error("Error creating appointment:", error);
@@ -264,8 +318,8 @@ async function loadSettings() {
 📅 Date : ${form.date}
 🕐 Heure : ${form.time}
 
-👤 Client : ${form.name}
-📱 Téléphone : ${form.phone}`;
+👤 Client : ${customerName}
+📱 Téléphone : ${customerPhone}`;
 
   const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(
   /\D/g,
@@ -392,8 +446,11 @@ const isSaturday = selectedDay === 6;
   e.preventDefault();
 
   if (
+    reviewSubmitting ||
     !reviewName.trim() ||
+    reviewName.trim().length > NAME_MAX_LENGTH ||
     reviewComment.trim().length < 5 ||
+    reviewComment.trim().length > 1000 ||
     reviewRating < 1 ||
     reviewRating > 5
   ) {
@@ -575,7 +632,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
         <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>
             <p className="mb-5 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
-              L'art du détail
+              L&apos;art du détail
             </p>
 
             <h2 className="max-w-3xl text-4xl font-black uppercase leading-[0.95] tracking-tight sm:text-6xl">
@@ -587,7 +644,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
           <div>
             <p className="text-base leading-8 text-white/50 sm:text-lg">
-              Une coupe réussie commence par l'écoute. Chez Chelba Coif,
+              Une coupe réussie commence par l&apos;écoute. Chez Chelba Coif,
               chaque détail est travaillé pour créer un résultat propre,
               moderne et adapté à votre style.
             </p>
@@ -634,7 +691,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 <div className="relative h-56 overflow-hidden sm:h-64">
                   <img
                     loading="lazy"
-                    src={service.image_url ?? ""}
+                    src={safeHttpUrl(service.image_url) ?? ""}
                     alt={service.name}
                     className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
                   />
@@ -696,11 +753,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
           <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-16">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/35">
-              L'expérience
+              L&apos;expérience
             </p>
 
             <h2 className="mt-5 text-4xl font-black uppercase leading-[0.95] sm:text-5xl">
-              Plus qu'une coupe.
+              Plus qu&apos;une coupe.
               <br />
               Une expérience.
             </h2>
@@ -766,7 +823,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               >
                 <img
                     loading="lazy"
-                  src={image.image_url}
+                  src={safeHttpUrl(image.image_url) ?? ""}
                   alt={image.title || `Chelba Coif gallery ${index + 1}`}
 className="h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"                />
               </motion.div>
@@ -841,7 +898,7 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
         </h3>
 
         <p className="mt-3 text-sm text-white/40">
-          Votre avis sera vérifié avant d'être publié sur le site.
+          Votre avis sera vérifié avant d&apos;être publié sur le site.
         </p>
       </div>
     ) : (
@@ -984,9 +1041,9 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
                 personnalisé.
               </p>
               <div className="mt-6 flex items-center gap-3">
-  {settings.instagram && (
+  {safeHttpUrl(settings.instagram) && (
     <a
-      href={settings.instagram}
+      href={safeHttpUrl(settings.instagram) ?? undefined}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Instagram"
@@ -1002,9 +1059,9 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
     </a>
   )}
 
-  {settings.facebook && (
+  {safeHttpUrl(settings.facebook) && (
     <a
-      href={settings.facebook}
+      href={safeHttpUrl(settings.facebook) ?? undefined}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Facebook"
@@ -1045,13 +1102,13 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
 
                 {/* GOOGLE MAPS */}
                 <a
-                  href={settings.maps_url || "#"}
+                  href={safeHttpUrl(settings.maps_url) ?? "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white hover:text-black"
                 >
                   <MapPin size={17} />
-                  Voir l'itinéraire
+                  Voir l&apos;itinéraire
                   <ArrowUpRight size={16} />
                 </a>
                   <div className="mt-6 text-center">
@@ -1455,6 +1512,8 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
                         <input
                           type="text"
                           placeholder="Ex. Ahmed Ben Ali"
+                          autoComplete="name"
+                          maxLength={NAME_MAX_LENGTH}
                           value={form.name}
                           onChange={(e) =>
                             setForm({
@@ -1475,6 +1534,11 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
                         <input
                           type="tel"
                           placeholder="+216 XX XXX XXX"
+                          autoComplete="tel"
+                          inputMode="tel"
+                          maxLength={20}
+                          pattern="\+?[0-9 .-]{8,20}"
+                          title="8 à 20 chiffres, ex. +216 50 882 529"
                           value={form.phone}
                           onChange={(e) =>
                             setForm({
@@ -1540,15 +1604,16 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
                   <button
                     type="submit"
                     disabled={
+                      submitting ||
                       !form.service ||
                       !form.date ||
                       !form.time ||
-                      !form.name ||
-                      !form.phone
+                      !form.name.trim() ||
+                      !form.phone.trim()
                     }
                     className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl bg-white py-4 text-sm font-black text-black shadow-xl transition hover:scale-[1.01] hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:scale-100"
                   >
-                    CONFIRMER MON RENDEZ-VOUS
+                    {submitting ? "ENVOI EN COURS..." : "CONFIRMER MON RENDEZ-VOUS"}
                     <ArrowUpRight size={18} />
                   </button>
 

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { safeHttpUrl } from "@/lib/url";
 
 type Section =
   | "dashboard"
@@ -51,8 +53,47 @@ type Review = {
   created_at: string;
 };
 
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+
+const STORAGE_PUBLIC_MARKER = "/storage/v1/object/public/gallery/";
+
+/** Chemin dans le bucket `gallery` à partir d'une URL publique, sinon null. */
+function storagePathFromPublicUrl(url: string | null | undefined) {
+  if (!url) return null;
+
+  const index = url.indexOf(STORAGE_PUBLIC_MARKER);
+
+  return index === -1
+    ? null
+    : url.substring(index + STORAGE_PUBLIC_MARKER.length);
+}
+
+function buildStorageFileName(file: File) {
+  return `${Date.now()}-${Math.random().toString(36).substring(2)}.${
+    IMAGE_EXTENSIONS[file.type]
+  }`;
+}
+
+function validateImageFile(file: File) {
+  if (!IMAGE_EXTENSIONS[file.type]) {
+    return "Format non supporté. Utilisez une image JPG, PNG ou WebP.";
+  }
+
+  if (file.size > MAX_IMAGE_SIZE) {
+    return "L'image ne doit pas dépasser 5 MB.";
+  }
+
+  return null;
+}
+
 export default function AdminPage() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [section, setSection] = useState<Section>("dashboard");
@@ -85,6 +126,16 @@ export default function AdminPage() {
   const [servicePrice, setServicePrice] = useState("");
   const [serviceDuration, setServiceDuration] = useState("");
   const [serviceImage, setServiceImage] = useState("");
+  const [uploadingServiceImage, setUploadingServiceImage] = useState(false);
+
+  // Image du service au moment où l'édition a commencé (pour supprimer
+  // l'ancien fichier du Storage si elle est remplacée).
+  const [originalServiceImage, setOriginalServiceImage] = useState("");
+
+  // Fichier uploadé pendant la saisie mais pas encore enregistré : il sera
+  // supprimé du Storage si l'utilisateur annule.
+  const [pendingServiceImagePath, setPendingServiceImagePath] =
+    useState<string | null>(null);
 
   const [editingServiceId, setEditingServiceId] =
     useState<number | null>(null);
@@ -150,7 +201,10 @@ export default function AdminPage() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  })();
 
   /* =========================
      DERIVED STATS
@@ -343,22 +397,124 @@ export default function AdminPage() {
     setServicePrice("");
     setServiceDuration("");
     setServiceImage("");
+    setOriginalServiceImage("");
+    setPendingServiceImagePath(null);
+  }
+
+  async function cancelServiceForm() {
+    if (pendingServiceImagePath) {
+      await supabase.storage
+        .from("gallery")
+        .remove([pendingServiceImagePath]);
+    }
+
+    setShowServiceForm(false);
+    resetServiceForm();
+  }
+
+  async function uploadServiceImage(
+    e: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    const validationError = validateImageFile(file);
+
+    if (validationError) {
+      alert(validationError);
+      e.target.value = "";
+      return;
+    }
+
+    setUploadingServiceImage(true);
+
+    try {
+      const filePath = `services/${buildStorageFileName(file)}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("gallery")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error(uploadError);
+        alert("Erreur lors de l'upload de l'image.");
+        return;
+      }
+
+      // Un fichier uploadé juste avant sans être enregistré devient inutile.
+      if (pendingServiceImagePath) {
+        await supabase.storage
+          .from("gallery")
+          .remove([pendingServiceImagePath]);
+      }
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("gallery").getPublicUrl(filePath);
+
+      setServiceImage(publicUrl);
+      setPendingServiceImagePath(filePath);
+    } finally {
+      setUploadingServiceImage(false);
+      e.target.value = "";
+    }
+  }
+
+  async function removeServiceImage() {
+    if (pendingServiceImagePath) {
+      await supabase.storage
+        .from("gallery")
+        .remove([pendingServiceImagePath]);
+      setPendingServiceImagePath(null);
+    }
+
+    setServiceImage("");
   }
 
   async function saveService() {
-    if (!serviceName.trim() || !servicePrice) {
+    const name = serviceName.trim();
+    const price = Number(servicePrice);
+    const duration = serviceDuration ? Number(serviceDuration) : null;
+    const imageUrl = serviceImage.trim();
+
+    if (!name || !servicePrice) {
       alert("Veuillez remplir le nom et le prix.");
       return;
     }
 
+    if (name.length > 80) {
+      alert("Le nom ne doit pas dépasser 80 caractères.");
+      return;
+    }
+
+    if (!Number.isFinite(price) || price < 0 || price > 10000) {
+      alert("Le prix doit être un nombre positif.");
+      return;
+    }
+
+    if (
+      duration !== null &&
+      (!Number.isInteger(duration) || duration <= 0 || duration > 480)
+    ) {
+      alert("La durée doit être un nombre entier de minutes (1 à 480).");
+      return;
+    }
+
+    if (imageUrl && !safeHttpUrl(imageUrl)) {
+      alert("L'URL de l'image doit commencer par http:// ou https://.");
+      return;
+    }
+
     const serviceData = {
-      name: serviceName.trim(),
-      description: serviceDescription.trim() || null,
-      price: Number(servicePrice),
-      duration: serviceDuration
-        ? Number(serviceDuration)
-        : null,
-      image_url: serviceImage.trim() || null,
+      name,
+      description: serviceDescription.trim().slice(0, 500) || null,
+      price,
+      duration,
+      image_url: imageUrl || null,
     };
 
     if (editingServiceId) {
@@ -385,6 +541,13 @@ export default function AdminPage() {
         alert("Erreur lors de l'ajout.");
         return;
       }
+    }
+
+    // L'ancienne image (stockée chez nous) n'est plus référencée : on la supprime.
+    const oldPath = storagePathFromPublicUrl(originalServiceImage);
+
+    if (oldPath && originalServiceImage !== imageUrl) {
+      await supabase.storage.from("gallery").remove([oldPath]);
     }
 
     setShowServiceForm(false);
@@ -545,8 +708,10 @@ export default function AdminPage() {
 
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("L'image ne doit pas dépasser 5 MB.");
+    const validationError = validateImageFile(file);
+
+    if (validationError) {
+      alert(validationError);
       e.target.value = "";
       return;
     }
@@ -554,9 +719,7 @@ export default function AdminPage() {
     setUploadingImage(true);
 
     try {
-      const extension =
-        file.name.split(".").pop()?.toLowerCase() ||
-        "jpg";
+      const extension = IMAGE_EXTENSIONS[file.type];
 
       const fileName = `${Date.now()}-${Math.random()
         .toString(36)
@@ -682,8 +845,10 @@ export default function AdminPage() {
 
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert("L'image ne doit pas dépasser 5 MB.");
+    const validationError = validateImageFile(file);
+
+    if (validationError) {
+      alert(validationError);
       e.target.value = "";
       return;
     }
@@ -691,9 +856,7 @@ export default function AdminPage() {
     setReplacingGalleryId(image.id);
 
     try {
-      const extension =
-        file.name.split(".").pop()?.toLowerCase() ||
-        "jpg";
+      const extension = IMAGE_EXTENSIONS[file.type];
 
       const newFileName = `${Date.now()}-${Math.random()
         .toString(36)
@@ -904,65 +1067,24 @@ export default function AdminPage() {
      AUTH
   ========================= */
 
-  useEffect(() => {
-    async function checkUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  /**
+   * Vérifie côté client que l'utilisateur figure dans `admin_users`.
+   * Ce contrôle n'est qu'un confort d'interface : la vraie barrière est
+   * la fonction SQL `is_admin()` utilisée par les policies RLS
+   * (voir supabase/security.sql). Un utilisateur non-admin ne peut donc
+   * rien lire ni modifier même s'il contourne cette page.
+   */
+  async function isAdminUser(userId: string) {
+    const { data, error } = await supabase
+      .from("admin_users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
 
-      setUser(user);
+    return !error && Boolean(data);
+  }
 
-      if (user) {
-        await Promise.all([
-          loadAppointments(),
-          loadDashboardStats(),
-          loadServices(),
-          loadGallery(),
-          loadReviews(),
-          loadSettings(),
-        ]);
-      }
-
-      setLoading(false);
-    }
-
-    checkUser();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  async function handleLogin(
-    e: React.FormEvent
-  ) {
-    e.preventDefault();
-
-    setLoginLoading(true);
-    setError("");
-
-    const { data, error } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-    if (error) {
-      setError(
-        "Email ou mot de passe incorrect."
-      );
-      setLoginLoading(false);
-      return;
-    }
-
-    setUser(data.user);
-
+  async function loadAll() {
     await Promise.all([
       loadAppointments(),
       loadDashboardStats(),
@@ -971,65 +1093,111 @@ export default function AdminPage() {
       loadReviews(),
       loadSettings(),
     ]);
+  }
+
+  function clearSessionData() {
+    setUser(null);
+    setAppointments([]);
+    setServices([]);
+    setGalleryImages([]);
+    setReviews([]);
+    setSection("dashboard");
+    setMobileMenuOpen(false);
+  }
+
+  async function rejectNonAdmin() {
+    await supabase.auth.signOut();
+    clearSessionData();
+    setError("Accès refusé. Ce compte n'est pas administrateur.");
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkUser() {
+      const {
+        data: { user: sessionUser },
+      } = await supabase.auth.getUser();
+
+      if (cancelled) return;
+
+      if (!sessionUser) {
+        setLoading(false);
+        return;
+      }
+
+      if (!(await isAdminUser(sessionUser.id))) {
+        await rejectNonAdmin();
+        setLoading(false);
+        return;
+      }
+
+      setUser(sessionUser);
+      await loadAll();
+      setLoading(false);
+    }
+
+    checkUser();
+
+    // Ne pas appeler d'autres méthodes Supabase de façon synchrone dans ce
+    // callback (risque de deadlock documenté). On ne gère ici que la
+    // déconnexion (autre onglet, expiration) ; la connexion passe par
+    // handleLogin qui fait déjà la vérification admin.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        clearSessionData();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+
+    setLoginLoading(true);
+    setError("");
+
+    const { data, error: signInError } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+    if (signInError || !data.user) {
+      setError("Email ou mot de passe incorrect.");
+      setLoginLoading(false);
+      return;
+    }
+
+    if (!(await isAdminUser(data.user.id))) {
+      await rejectNonAdmin();
+      setLoginLoading(false);
+      return;
+    }
+
+    setPassword("");
+    setUser(data.user);
+
+    await loadAll();
 
     setLoginLoading(false);
   }
 
   async function logout() {
     await supabase.auth.signOut();
-    setUser(null);
+    clearSessionData();
   }
 
   /* =========================
      HELPERS
   ========================= */
-
-  function formatAppointmentDate(date: string) {
-    return new Date(
-      `${date}T00:00:00`
-    ).toLocaleDateString("fr-FR", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-    });
-  }
-
-  function formatLongDate(date: string) {
-    return new Date(
-      `${date}T00:00:00`
-    ).toLocaleDateString("fr-FR", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  }
-
-  function getStatusLabel(status: string) {
-    switch (status) {
-      case "confirmed":
-        return "Confirmé";
-      case "cancelled":
-        return "Annulé";
-      case "completed":
-        return "Terminé";
-      default:
-        return "En attente";
-    }
-  }
-
-  function getStatusClass(status: string) {
-    switch (status) {
-      case "confirmed":
-        return "border-emerald-400/20 bg-emerald-400/10 text-emerald-400";
-      case "cancelled":
-        return "border-red-400/20 bg-red-400/10 text-red-400";
-      case "completed":
-        return "border-blue-400/20 bg-blue-400/10 text-blue-400";
-      default:
-        return "border-amber-400/20 bg-amber-400/10 text-amber-400";
-    }
-  }
 
   function getInitials(name: string) {
     const parts = name
@@ -1068,7 +1236,7 @@ export default function AdminPage() {
           </div>
 
           <p className="mt-4 text-sm text-white/40">
-            Chargement de l'administration...
+            Chargement de l&apos;administration...
           </p>
         </div>
       </main>
@@ -1121,6 +1289,8 @@ export default function AdminPage() {
 
                 <input
                   type="email"
+                  autoComplete="username"
+                  maxLength={254}
                   value={email}
                   onChange={(e) =>
                     setEmail(e.target.value)
@@ -1138,6 +1308,7 @@ export default function AdminPage() {
 
                 <input
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) =>
                     setPassword(e.target.value)
@@ -1959,20 +2130,65 @@ export default function AdminPage() {
                           </div>
                         </FormField>
 
-                        <FormField label="Image URL">
-                          <input
-                            value={
-                              serviceImage
-                            }
-                            onChange={(e) =>
-                              setServiceImage(
-                                e.target.value
-                              )
-                            }
-                            placeholder="https://..."
-                            className={inputClass}
-                          />
-                        </FormField>
+                        <div className="md:col-span-2">
+                          <FormField label="Image">
+                            <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 sm:flex-row sm:items-center">
+                              {serviceImage ? (
+                                <img
+                                  src={serviceImage}
+                                  alt="Aperçu du service"
+                                  className="h-24 w-24 shrink-0 rounded-xl border border-white/10 object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-dashed border-white/15 text-2xl text-white/20">
+                                  ✂
+                                </div>
+                              )}
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap gap-2">
+                                  <label
+                                    className={`inline-flex cursor-pointer items-center rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-black transition hover:bg-white/90 ${
+                                      uploadingServiceImage
+                                        ? "cursor-not-allowed opacity-60"
+                                        : ""
+                                    }`}
+                                  >
+                                    {uploadingServiceImage
+                                      ? "Upload..."
+                                      : serviceImage
+                                      ? "Changer l'image"
+                                      : "+ Choisir une image"}
+
+                                    <input
+                                      type="file"
+                                      accept="image/jpeg,image/png,image/webp"
+                                      className="hidden"
+                                      disabled={uploadingServiceImage}
+                                      onChange={uploadServiceImage}
+                                    />
+                                  </label>
+
+                                  {serviceImage && (
+                                    <button
+                                      type="button"
+                                      onClick={removeServiceImage}
+                                      disabled={uploadingServiceImage}
+                                      className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-white/50 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                                    >
+                                      Retirer
+                                    </button>
+                                  )}
+                                </div>
+
+                                <p className="mt-2 text-xs leading-5 text-white/30">
+                                  JPG, PNG ou WEBP • maximum 5 MB. Chargée
+                                  depuis votre appareil.
+                                </p>
+                              </div>
+                            </div>
+                          </FormField>
+                        </div>
 
                         <div className="md:col-span-2">
                           <FormField label="Description">
@@ -2007,12 +2223,7 @@ export default function AdminPage() {
                         </button>
 
                         <button
-                          onClick={() => {
-                            setShowServiceForm(
-                              false
-                            );
-                            resetServiceForm();
-                          }}
+                          onClick={cancelServiceForm}
                           className="rounded-xl border border-white/10 px-5 py-3 text-sm text-white/50 transition hover:bg-white/10 hover:text-white"
                         >
                           Annuler
@@ -2068,6 +2279,13 @@ export default function AdminPage() {
                             setServiceImage(
                               service.image_url ??
                                 ""
+                            );
+                            setOriginalServiceImage(
+                              service.image_url ??
+                                ""
+                            );
+                            setPendingServiceImagePath(
+                              null
                             );
                             setShowServiceForm(
                               true
@@ -2133,6 +2351,17 @@ export default function AdminPage() {
                                 "Impossible de supprimer ce service. Il est peut-être utilisé par un rendez-vous."
                               );
                               return;
+                            }
+
+                            const imagePath =
+                              storagePathFromPublicUrl(
+                                service.image_url
+                              );
+
+                            if (imagePath) {
+                              await supabase.storage
+                                .from("gallery")
+                                .remove([imagePath]);
                             }
 
                             await loadServices();
@@ -2450,7 +2679,7 @@ export default function AdminPage() {
                                 </p>
 
                                 <h4 className="mt-1 text-lg font-bold">
-                                  Modifier l'avis
+                                  Modifier l&apos;avis
                                 </h4>
                               </div>
 
