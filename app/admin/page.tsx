@@ -14,6 +14,9 @@ import {
 } from "@/lib/schedule";
 import { ScheduleEditor } from "@/components/admin/ScheduleEditor";
 import { ClosuresEditor } from "@/components/admin/ClosuresEditor";
+import { AgendaView } from "@/components/admin/AgendaView";
+import { InsightsPanel } from "@/components/admin/InsightsPanel";
+import { type ClientMessageKind, clientMessages, whatsappUrl } from "@/lib/whatsapp";
 
 type Section =
   | "dashboard"
@@ -119,6 +122,11 @@ export default function AdminPage() {
   const [appointmentSearch, setAppointmentSearch] = useState("");
   const [appointmentFilter, setAppointmentFilter] = useState("all");
   const [appointmentDateFilter, setAppointmentDateFilter] = useState("");
+  const [appointmentView, setAppointmentView] = useState<"list" | "agenda">("list");
+  const [agendaDate, setAgendaDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  });
 
   /* =========================
      SERVICES
@@ -607,6 +615,27 @@ export default function AdminPage() {
           : appointment
       )
     );
+
+    // Prévenir le client sur WhatsApp (le bouton reste disponible sur la
+    // carte si le navigateur bloque l'ouverture automatique).
+    if (status === "confirmed" || status === "cancelled") {
+      const appointment = appointments.find((a) => a.id === id);
+
+      if (appointment) {
+        const url = whatsappUrl(
+          appointment.phone,
+          clientMessages[status]({
+            customer_name: appointment.customer_name,
+            appointment_date: appointment.appointment_date,
+            appointment_time: appointment.appointment_time,
+            service: appointment.services?.[0]?.name,
+            shopName: settings.shop_name,
+          })
+        );
+
+        if (url) window.open(url, "_blank", "noopener");
+      }
+    }
   }
 
   async function deleteAppointment(id: number) {
@@ -1720,6 +1749,10 @@ export default function AdminPage() {
                   />
                 </div>
 
+                {/* INSIGHTS */}
+
+                <InsightsPanel appointments={appointments} />
+
                 {/* RECENT APPOINTMENTS */}
 
                 <div className="mt-8 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
@@ -1830,6 +1863,45 @@ export default function AdminPage() {
                       : "↻ Actualiser"}
                   </button>
                 </div>
+
+                {/* VIEW TOGGLE */}
+
+                <div className="mb-6 inline-flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
+                  {(
+                    [
+                      ["list", "☰ Liste"],
+                      ["agenda", "▦ Agenda du jour"],
+                    ] as const
+                  ).map(([view, label]) => (
+                    <button
+                      key={view}
+                      type="button"
+                      onClick={() => setAppointmentView(view)}
+                      className={`min-h-10 rounded-lg px-4 text-xs font-semibold transition ${
+                        appointmentView === view
+                          ? "bg-white text-black"
+                          : "text-white/50 hover:text-white"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {appointmentView === "agenda" && (
+                  <AgendaView
+                    appointments={appointments}
+                    schedule={settings.schedule}
+                    interval={settings.slot_interval}
+                    date={agendaDate}
+                    onDateChange={setAgendaDate}
+                    onStatusChange={updateAppointmentStatus}
+                    statusLabel={getStatusLabelStatic}
+                    statusClass={getStatusClassStatic}
+                  />
+                )}
+
+                {appointmentView === "list" && (<>
 
                 {/* APPOINTMENT STATS */}
 
@@ -2046,6 +2118,8 @@ export default function AdminPage() {
                     )}
                   </div>
                 )}
+
+                </>)}
               </div>
             )}
 
@@ -3517,8 +3591,43 @@ function AppointmentCard({
   onCancel: () => void;
   onDelete: () => void;
 }) {
-  const whatsappNumber =
-    appointment.phone.replace(/\D/g, "");
+  const messageKind = (
+    ["pending", "confirmed", "cancelled"] as ClientMessageKind[]
+  ).includes(appointment.status as ClientMessageKind)
+    ? (appointment.status as ClientMessageKind)
+    : null;
+
+  const whatsappHref = whatsappUrl(
+    appointment.phone,
+    messageKind
+      ? clientMessages[messageKind]({
+          customer_name: appointment.customer_name,
+          appointment_date: appointment.appointment_date,
+          appointment_time: appointment.appointment_time,
+          service: service?.name,
+        })
+      : undefined
+  );
+
+  const reminderHref =
+    appointment.status === "confirmed"
+      ? whatsappUrl(
+          appointment.phone,
+          clientMessages.reminder({
+            customer_name: appointment.customer_name,
+            appointment_date: appointment.appointment_date,
+            appointment_time: appointment.appointment_time,
+            service: service?.name,
+          })
+        )
+      : null;
+
+  const whatsappLabel =
+    appointment.status === "confirmed"
+      ? "📲 Envoyer la confirmation"
+      : appointment.status === "cancelled"
+      ? "📲 Prévenir de l'annulation"
+      : "WhatsApp";
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] transition hover:border-white/[0.12]">
@@ -3632,14 +3741,30 @@ function AppointmentCard({
                 </button>
               )}
 
-            {whatsappNumber && (
+            {whatsappHref && (
               <a
-                href={`https://wa.me/${whatsappNumber}`}
+                href={whatsappHref}
                 target="_blank"
                 rel="noreferrer"
+                className={`min-h-11 flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition sm:flex-none ${
+                  appointment.status === "confirmed"
+                    ? "bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25"
+                    : "bg-white/[0.06] text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {whatsappLabel}
+              </a>
+            )}
+
+            {reminderHref && (
+              <a
+                href={reminderHref}
+                target="_blank"
+                rel="noreferrer"
+                title="Envoyer un rappel le jour du rendez-vous"
                 className="min-h-11 flex-1 rounded-lg bg-white/[0.06] px-3 py-2 text-xs font-semibold text-white/60 transition hover:bg-white/10 hover:text-white sm:flex-none"
               >
-                WhatsApp
+                ⏰ Rappel
               </a>
             )}
 
