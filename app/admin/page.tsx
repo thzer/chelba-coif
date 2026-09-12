@@ -1225,9 +1225,13 @@ export default function AdminPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#070707] text-white">
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-xl font-black text-black">
-            C
-          </div>
+          <img
+            src="/logo.png"
+            alt="Chelba Coif"
+            width={64}
+            height={64}
+            className="mx-auto h-16 w-16"
+          />
 
           <div className="mt-5 flex items-center justify-center gap-2">
             <span className="h-2 w-2 animate-pulse rounded-full bg-white/80" />
@@ -1254,9 +1258,13 @@ export default function AdminPage() {
 
         <div className="relative w-full max-w-md">
           <div className="mb-8 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-2xl font-black text-black shadow-2xl">
-              C
-            </div>
+            <img
+              src="/logo.png"
+              alt="Chelba Coif"
+              width={88}
+              height={88}
+              className="mx-auto h-22 w-22"
+            />
 
             <h1 className="mt-5 text-3xl font-black tracking-tight">
               Chelba Coif
@@ -1360,9 +1368,13 @@ export default function AdminPage() {
         <aside className="hidden w-[270px] shrink-0 border-r border-white/[0.08] bg-[#090909] lg:flex lg:flex-col">
           <div className="border-b border-white/[0.08] p-6">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white font-black text-black shadow-lg">
-                C
-              </div>
+              <img
+                src="/logo.png"
+                alt=""
+                width={44}
+                height={44}
+                className="h-11 w-11 shrink-0"
+              />
 
               <div className="min-w-0">
                 <h1 className="truncate font-bold">

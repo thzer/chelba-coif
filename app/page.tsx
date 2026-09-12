@@ -499,8 +499,15 @@ const isSaturday = selectedDay === 6;
         <nav className="mx-auto flex max-w-7xl items-center justify-between rounded-2xl border border-white/10 bg-black/70 px-4 py-3 shadow-2xl shadow-black/20 backdrop-blur-2xl sm:rounded-full sm:px-6">
           <button
             onClick={() => scrollTo("top")}
-            className="text-sm font-black tracking-[0.22em] transition hover:opacity-70 sm:text-base"
+            className="flex items-center gap-2.5 text-sm font-black tracking-[0.22em] transition hover:opacity-70 sm:gap-3 sm:text-base"
           >
+            <img
+              src="/logo.png"
+              alt=""
+              width={36}
+              height={36}
+              className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
+            />
             {settings.shop_name || "CHELBA COIF"}
           </button>
 
@@ -1040,6 +1047,14 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
         <div className="mx-auto max-w-7xl px-5 py-16 sm:px-6">
           <div className="grid gap-12 md:grid-cols-3">
             <div>
+              <img
+                src="/logo.png"
+                alt="Logo Chelba Coif"
+                width={64}
+                height={64}
+                className="mb-4 h-16 w-16"
+              />
+
               <p className="text-lg font-black tracking-[0.2em]">
                 {settings.shop_name || "CHELBA COIF"}
               </p>
