@@ -26,6 +26,17 @@ const adminHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  images: {
+    // Seuls ces hôtes passent par l'optimiseur d'images (voir SmartImage).
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "napycyccvnqxgzmkjydf.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+      { protocol: "https", hostname: "images.unsplash.com" },
+    ],
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

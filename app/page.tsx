@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { safeHttpUrl } from "@/lib/url";
+import Image from "next/image";
+import { SmartImage } from "@/components/SmartImage";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -501,11 +503,12 @@ const isSaturday = selectedDay === 6;
             onClick={() => scrollTo("top")}
             className="flex items-center gap-2.5 text-sm font-black tracking-[0.22em] transition hover:opacity-70 sm:gap-3 sm:text-base"
           >
-            <img
+            <Image
               src="/logo.png"
               alt=""
               width={36}
               height={36}
+              priority
               className="h-8 w-8 shrink-0 sm:h-9 sm:w-9"
             />
             {settings.shop_name || "CHELBA COIF"}
@@ -577,10 +580,11 @@ const isSaturday = selectedDay === 6;
         id="top"
         className="relative flex min-h-[92svh] items-end overflow-hidden sm:min-h-screen"
       >
-        <img
+        <SmartImage
           src="https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=2200&q=90"
           alt="Barber shop"
-          className="absolute inset-0 h-full w-full object-cover"
+          priority
+          className="object-cover"
         />
 
         <div className="absolute inset-0 bg-black/60" />
@@ -703,11 +707,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 className="group overflow-hidden rounded-2xl border border-white/[0.08] bg-[#151515] transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-2xl hover:shadow-black/40"
               >
                 <div className="relative h-56 overflow-hidden sm:h-64">
-                  <img
-                    loading="lazy"
+                  <SmartImage
                     src={safeHttpUrl(service.image_url) ?? ""}
                     alt={service.name}
-                    className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
+                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                    className="object-cover transition duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
                   />
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
@@ -747,11 +751,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
       >
         <div className="grid overflow-hidden rounded-3xl border border-white/10 bg-[#141414] lg:grid-cols-2">
           <div className="relative min-h-[450px]">
-            <img
-                    loading="lazy"
+            <SmartImage
               src="https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?auto=format&fit=crop&w=1400&q=90"
               alt="Barber experience"
-              className="absolute inset-0 h-full w-full object-cover"
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-cover"
             />
 
             <div className="absolute inset-0 bg-black/20" />
@@ -831,15 +835,16 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.05 }}
-                className={`group overflow-hidden rounded-2xl ${
+                className={`group relative overflow-hidden rounded-2xl ${
                   index === 0 ? "sm:row-span-2 sm:h-[530px] lg:h-[650px]" : "h-72 sm:h-80"
                 }`}
               >
-                <img
-                    loading="lazy"
+                <SmartImage
                   src={safeHttpUrl(image.image_url) ?? ""}
                   alt={image.title || `Chelba Coif gallery ${index + 1}`}
-className="h-full w-full object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"                />
+                  sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
+                  className="object-cover transition-all duration-700 ease-out group-hover:scale-110 group-hover:brightness-110"
+                />
               </motion.div>
             ))}
           </div>
@@ -1047,7 +1052,7 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
         <div className="mx-auto max-w-7xl px-5 py-16 sm:px-6">
           <div className="grid gap-12 md:grid-cols-3">
             <div>
-              <img
+              <Image
                 src="/logo.png"
                 alt="Logo Chelba Coif"
                 width={64}

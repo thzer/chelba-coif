@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { safeHttpUrl } from "@/lib/url";
 
@@ -1225,7 +1226,7 @@ export default function AdminPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#070707] text-white">
         <div className="text-center">
-          <img
+          <Image
             src="/logo.png"
             alt="Chelba Coif"
             width={64}
@@ -1258,11 +1259,12 @@ export default function AdminPage() {
 
         <div className="relative w-full max-w-md">
           <div className="mb-8 text-center">
-            <img
+            <Image
               src="/logo.png"
               alt="Chelba Coif"
               width={88}
               height={88}
+              priority
               className="mx-auto h-22 w-22"
             />
 
@@ -1368,7 +1370,7 @@ export default function AdminPage() {
         <aside className="hidden w-[270px] shrink-0 border-r border-white/[0.08] bg-[#090909] lg:flex lg:flex-col">
           <div className="border-b border-white/[0.08] p-6">
             <div className="flex items-center gap-2 sm:gap-3">
-              <img
+              <Image
                 src="/logo.png"
                 alt=""
                 width={44}
