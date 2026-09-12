@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { SITE_URL } from "@/lib/site";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,6 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
+  alternates: { canonical: "/" },
   title: "Chelba Coif | Barber Shop à Djerba",
   description:
     "Chelba Coif, barber shop à Djerba. Coupes modernes, fades, barbe et finitions précises. Réservez votre rendez-vous facilement.",
@@ -31,6 +34,8 @@ export const metadata: Metadata = {
       "Coupes modernes, fades, barbe et finitions précises à Djerba.",
     type: "website",
     locale: "fr_TN",
+    url: SITE_URL,
+    siteName: "Chelba Coif",
   },
 };
 
@@ -41,7 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     name: "Chelba Coif",
     description:
       "Barber shop à Djerba. Coupes modernes, fades, barbe et finitions précises.",
-    url: "https://chelba-coif-six.vercel.app",
+    url: SITE_URL,
     telephone: "+21650882529",
     priceRange: "15–30 TND",
   };

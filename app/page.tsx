@@ -988,6 +988,7 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
 
             <p className="mt-3 text-center text-xs text-white/25">
               Votre avis sera publié après validation par Chelba Coif.
+              Seul le nom que vous indiquez sera affiché publiquement.
             </p>
           </div>
         </form>
@@ -1619,7 +1620,9 @@ className="h-full w-full object-cover transition-all duration-700 ease-out group
 
                   <p className="mt-4 text-center text-xs leading-5 text-white/20">
                     En confirmant, votre demande de rendez-vous sera
-                    préparée pour Chelba Coif.
+                    préparée pour Chelba Coif. Votre nom et votre numéro
+                    servent uniquement à gérer ce rendez-vous et ne sont
+                    jamais partagés.
                   </p>
                 </form>
               )}
