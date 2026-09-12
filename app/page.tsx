@@ -5,6 +5,20 @@ import { supabase } from "@/lib/supabase";
 import { safeHttpUrl } from "@/lib/url";
 import Image from "next/image";
 import { SmartImage } from "@/components/SmartImage";
+import {
+  type BookedSlot,
+  type Closure,
+  type WeekSchedule,
+  DAY_NAMES_FR,
+  DEFAULT_SCHEDULE,
+  DEFAULT_SLOT_INTERVAL,
+  WEEK_DAYS,
+  computeAvailableSlots,
+  findClosure,
+  formatDayHours,
+  getDaySchedule,
+  toDateString,
+} from "@/lib/schedule";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -64,7 +78,21 @@ const [reviewSubmitted, setReviewSubmitted] = useState(false);
       image_url: string | null;
     }[]
   >([]);
-const [settings, setSettings] = useState({
+const [closures, setClosures] = useState<Closure[]>([]);
+const [settings, setSettings] = useState<{
+  shop_name: string;
+  phone: string;
+  whatsapp: string;
+  address: string;
+  opening_hours: string;
+  instagram: string;
+  facebook: string;
+  maps_url: string;
+  schedule: WeekSchedule;
+  slot_interval: number;
+}>({
+  schedule: DEFAULT_SCHEDULE,
+  slot_interval: DEFAULT_SLOT_INTERVAL,
   shop_name: "Chelba Coif",
   phone: "",
   whatsapp: "",
@@ -142,11 +170,34 @@ async function loadSettings() {
   }
 
   if (data) {
-  setSettings(data);
+    setSettings((prev) => ({
+      ...prev,
+      ...data,
+      schedule: data.schedule ?? DEFAULT_SCHEDULE,
+      slot_interval: data.slot_interval ?? DEFAULT_SLOT_INTERVAL,
+    }));
+  }
 }
+
+async function loadClosures() {
+  const todayStr = toDateString(new Date());
+
+  const { data, error } = await supabase
+    .from("closures")
+    .select("id, start_date, end_date, reason")
+    .gte("end_date", todayStr)
+    .order("start_date");
+
+  if (error) {
+    console.error("Error loading closures:", error);
+    return;
+  }
+
+  setClosures(data ?? []);
 }
 
   loadSettings();
+  loadClosures();
 }, []);
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -159,9 +210,9 @@ async function loadSettings() {
     phone: "",
   });
 
-  const [bookedAppointments, setBookedAppointments] = useState<
-    { appointment_date: string; appointment_time: string }[]
-  >([]);
+  const [bookedAppointments, setBookedAppointments] = useState<BookedSlot[]>(
+    []
+  );
 
   useEffect(() => {
     async function loadBookedAppointments() {
@@ -170,43 +221,21 @@ async function loadSettings() {
         return;
       }
 
-      // RPC sécurisée : ne renvoie que les heures, jamais les noms/téléphones.
-      const { data: rpcData, error: rpcError } = await supabase.rpc(
-        "get_booked_slots",
-        { target_date: form.date }
-      );
-
-      if (!rpcError) {
-        setBookedAppointments(
-          ((rpcData as { appointment_time: string }[] | null) ?? []).map(
-            (slot) => ({
-              appointment_date: form.date,
-              appointment_time: slot.appointment_time.slice(0, 5),
-            })
-          )
-        );
-        return;
-      }
-
-      // Fallback tant que supabase/security.sql n'est pas appliqué.
-      const { data, error } = await supabase
-        .from("appointments")
-        .select("appointment_date, appointment_time")
-        .eq("appointment_date", form.date)
-        .in("status", ["pending", "confirmed"]);
+      // RPC sécurisée : heures + durées uniquement, jamais de données perso.
+      const { data, error } = await supabase.rpc("get_booked_slots", {
+        target_date: form.date,
+      });
 
       if (error) {
-        console.error("Error loading booked appointments:", error);
+        console.error("Error loading booked slots:", error);
         setBookedAppointments([]);
         return;
       }
 
-      // La colonne est de type `time` : Postgres renvoie "09:00:00",
-      // le front travaille en "09:00".
       setBookedAppointments(
-        (data ?? []).map((appointment) => ({
-          ...appointment,
-          appointment_time: appointment.appointment_time.slice(0, 5),
+        ((data as BookedSlot[] | null) ?? []).map((slot) => ({
+          appointment_time: slot.appointment_time.slice(0, 5),
+          duration: slot.duration,
         }))
       );
     }
@@ -351,106 +380,24 @@ async function loadSettings() {
     now.getMonth() + 1
   ).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  const selectedDate = form.date
-    ? new Date(`${form.date}T12:00:00`)
+  const serviceDuration = selectedService?.duration || 30;
+
+  const daySchedule = form.date
+    ? getDaySchedule(settings.schedule, form.date)
     : null;
+  const closure = form.date ? findClosure(closures, form.date) : null;
+  const dayClosed = Boolean(form.date) && (!daySchedule || Boolean(closure));
 
-  const selectedDay = selectedDate?.getDay();
-
-  const isSunday = selectedDay === 0;
-const isWednesday = selectedDay === 3;
-const isSaturday = selectedDay === 6;
-
-  const openingTime = "09:00";
-  const closingTime = isSaturday ? "20:00" : "19:00";
-
-  const allTimeSlots = [
-    "09:00",
-    "09:30",
-    "10:00",
-    "10:30",
-    "11:00",
-    "11:30",
-    "12:00",
-    "12:30",
-    "14:00",
-    "14:30",
-    "15:00",
-    "15:30",
-    "16:00",
-    "16:30",
-    "17:00",
-    "17:30",
-    "18:00",
-    "18:30",
-    "19:00",
-    "19:30",
-    "20:00",
-  ];
-
-  // Convert "30 min" -> 30
-  const serviceDuration = selectedService
-  ? selectedService.duration
-  : 30;
-
-  const availableTimeSlots = allTimeSlots.filter((time) => {
-    if (!selectedDate || isWednesday) {
-      return false;
-    }
-
-    const isBooked = bookedAppointments.some(
-      (appointment) => appointment.appointment_time === time
-    );
-
-    if (isBooked) {
-      return false;
-    }
-
-    // Lunch break: 12:30 - 14:00
-    if (time === "12:30") {
-      return false;
-    }
-
-    // Convert selected time to minutes
-    const [hours, minutes] = time.split(":").map(Number);
-
-    const startMinutes = hours * 60 + minutes;
-
-    // Convert closing time to minutes
-    const [closingHours, closingMinutes] = closingTime
-      .split(":")
-      .map(Number);
-
-    const closingMinutesTotal =
-      closingHours * 60 + closingMinutes;
-
-    // Appointment must finish before closing
-    const endMinutes = startMinutes + serviceDuration;
-
-    if (endMinutes > closingMinutesTotal) {
-      return false;
-    }
-
-    // Don't allow times before opening
-    if (time < openingTime) {
-      return false;
-    }
-
-    // Don't allow times already passed today
-    if (form.date === today) {
-      const currentTime = new Date();
-
-      const currentMinutes =
-        currentTime.getHours() * 60 +
-        currentTime.getMinutes();
-
-      if (startMinutes <= currentMinutes) {
-        return false;
-      }
-    }
-
-    return true;
+  const availableTimeSlots = computeAvailableSlots({
+    schedule: settings.schedule,
+    closures,
+    date: form.date,
+    interval: settings.slot_interval,
+    serviceDuration,
+    booked: bookedAppointments,
+    now,
   });
+
   async function handleReviewSubmit(e: React.FormEvent) {
   e.preventDefault();
 
@@ -1160,13 +1107,15 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
   <Clock size={17} className="mt-1 shrink-0" />
 
   <div className="space-y-1">
-    <div>Lun – Mar : 09:00 – 19:00</div>
-    <div className="text-white/40">
-      Mercredi : fermé
-    </div>
-    <div>Jeu – Ven : 09:00 – 19:00</div>
-    <div>Samedi : 09:00 – 20:00</div>
-    <div>Dimanche : 09:00 – 19:00</div>
+    {WEEK_DAYS.map((key) => {
+      const day = settings.schedule[key] ?? null;
+
+      return (
+        <div key={key} className={day ? "" : "text-white/40"}>
+          {DAY_NAMES_FR[key]} : {formatDayHours(day)}
+        </div>
+      );
+    })}
   </div>
 </div>
               </div>
@@ -1445,17 +1394,20 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                           />
                         </div>
 
-                        {form.date && isWednesday && (
-  <p className="mt-2 text-xs font-semibold text-white/40">
-    Le salon est fermé le mercredi.
-  </p>
-)}
+                        {dayClosed && (
+                          <p className="mt-2 text-xs font-semibold text-white/40">
+                            {closure
+                              ? `Le salon est fermé${
+                                  closure.reason ? ` : ${closure.reason}` : " ce jour-là"
+                                }.`
+                              : "Le salon est fermé ce jour-là."}
+                          </p>
+                        )}
 
-                        {form.date && !isSunday && (
+                        {form.date && !dayClosed && daySchedule && (
                           <p className="mt-2 text-xs text-white/25">
-                            {isSaturday
-                              ? "Samedi : 09:00 – 20:00"
-                              : "Lundi – Vendredi : 09:00 – 19:00"}
+                            {DAY_NAMES_FR[String(new Date(`${form.date}T12:00:00`).getDay())]}{" "}
+                            : {formatDayHours(daySchedule)}
                           </p>
                         )}
                       </div>
@@ -1474,7 +1426,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 
 <select
   value={form.time}
-  disabled={!form.date || isWednesday}
+  disabled={!form.date || dayClosed}
   onChange={(e) =>
     setForm({
       ...form,
@@ -1487,8 +1439,8 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
   <option value="">
     {!form.date
       ? "Choisissez d'abord une date"
-      : isWednesday
-      ? "Salon fermé le mercredi"
+      : dayClosed
+      ? "Salon fermé"
       : availableTimeSlots.length === 0
       ? "Aucun créneau disponible"
       : "Choisir une heure"}
@@ -1502,13 +1454,11 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
 </select>
                         </div>
 
-                        {form.date && !isWednesday && (
-  <p className="mt-2 text-xs text-white/25">
-    {isSaturday
-      ? "Samedi : 09:00 – 20:00"
-      : "09:00 – 19:00"}
-  </p>
-)}
+                        {form.date && !dayClosed && selectedService && (
+                          <p className="mt-2 text-xs text-white/25">
+                            Durée : {serviceDuration} min
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -5,6 +5,15 @@ import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { safeHttpUrl } from "@/lib/url";
+import {
+  type WeekSchedule,
+  DEFAULT_SCHEDULE,
+  DEFAULT_SLOT_INTERVAL,
+  WEEK_DAYS,
+  validateDay,
+} from "@/lib/schedule";
+import { ScheduleEditor } from "@/components/admin/ScheduleEditor";
+import { ClosuresEditor } from "@/components/admin/ClosuresEditor";
 
 type Section =
   | "dashboard"
@@ -178,7 +187,19 @@ export default function AdminPage() {
      SETTINGS
   ========================= */
 
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<{
+    id: number;
+    shop_name: string;
+    phone: string;
+    whatsapp: string;
+    address: string;
+    opening_hours: string;
+    instagram: string;
+    facebook: string;
+    maps_url: string;
+    schedule: WeekSchedule;
+    slot_interval: number;
+  }>({
     id: 1,
     shop_name: "Chelba Coif",
     phone: "",
@@ -188,6 +209,8 @@ export default function AdminPage() {
     instagram: "",
     facebook: "",
     maps_url: "",
+    schedule: DEFAULT_SCHEDULE,
+    slot_interval: DEFAULT_SLOT_INTERVAL,
   });
 
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -633,13 +656,30 @@ export default function AdminPage() {
     }
 
     if (data) {
-      setSettings(data);
+      setSettings({
+        ...data,
+        schedule: data.schedule ?? DEFAULT_SCHEDULE,
+        slot_interval: data.slot_interval ?? DEFAULT_SLOT_INTERVAL,
+      });
     }
 
     setSettingsLoading(false);
   }
 
   async function saveSettings() {
+    for (const key of WEEK_DAYS) {
+      const problem = validateDay(settings.schedule[key] ?? null);
+      if (problem) {
+        alert(`Horaires : ${problem}`);
+        return;
+      }
+    }
+
+    if (Object.values(settings.schedule).every((day) => !day)) {
+      alert("Le salon doit être ouvert au moins un jour par semaine.");
+      return;
+    }
+
     setSettingsSaving(true);
 
     const { data, error } = await supabase
@@ -653,6 +693,8 @@ export default function AdminPage() {
         instagram: settings.instagram,
         facebook: settings.facebook,
         maps_url: settings.maps_url,
+        schedule: settings.schedule,
+        slot_interval: settings.slot_interval,
         updated_at: new Date().toISOString(),
       })
       .eq("id", 1)
@@ -3027,27 +3069,6 @@ export default function AdminPage() {
                           />
                         </FormField>
 
-                        <FormField label="Horaires">
-                          <input
-                            type="text"
-                            value={
-                              settings.opening_hours
-                            }
-                            onChange={(e) =>
-                              setSettings({
-                                ...settings,
-                                opening_hours:
-                                  e.target
-                                    .value,
-                              })
-                            }
-                            className={
-                              inputClass
-                            }
-                            placeholder="09:00 - 19:00"
-                          />
-                        </FormField>
-
                         <div className="sm:col-span-2">
                           <FormField label="Adresse">
                             <input
@@ -3071,6 +3092,67 @@ export default function AdminPage() {
                           </FormField>
                         </div>
 
+                      </div>
+                    </div>
+
+                    {/* SCHEDULE */}
+
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                      <div className="border-b border-white/[0.07] p-5 sm:p-6">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
+                            ◷
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold">
+                              Horaires d&apos;ouverture
+                            </h4>
+
+                            <p className="mt-0.5 text-xs text-white/30">
+                              Définissent les créneaux réservables et
+                              les horaires affichés sur le site.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 sm:p-6">
+                        <ScheduleEditor
+                          schedule={settings.schedule}
+                          interval={settings.slot_interval}
+                          onChange={(schedule, slot_interval) =>
+                            setSettings({ ...settings, schedule, slot_interval })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* CLOSURES */}
+
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                      <div className="border-b border-white/[0.07] p-5 sm:p-6">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
+                            ✕
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold">
+                              Fermetures exceptionnelles
+                            </h4>
+
+                            <p className="mt-0.5 text-xs text-white/30">
+                              Vacances, jours fériés… Enregistrées
+                              immédiatement, sans passer par le bouton
+                              ci-dessous.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 sm:p-6">
+                        <ClosuresEditor />
                       </div>
                     </div>
 
