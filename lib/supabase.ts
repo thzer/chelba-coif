@@ -15,6 +15,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false,
+    // Nécessaire pour le lien « mot de passe oublié » (session dans l'URL).
+    detectSessionInUrl: true,
   },
 });

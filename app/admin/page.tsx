@@ -16,6 +16,8 @@ import { ScheduleEditor } from "@/components/admin/ScheduleEditor";
 import { ClosuresEditor } from "@/components/admin/ClosuresEditor";
 import { AgendaView } from "@/components/admin/AgendaView";
 import { InsightsPanel } from "@/components/admin/InsightsPanel";
+import { SecurityPanel } from "@/components/admin/SecurityPanel";
+import { SITE_URL } from "@/lib/site";
 import { type ClientMessageKind, clientMessages, whatsappUrl } from "@/lib/whatsapp";
 
 type Section =
@@ -232,6 +234,12 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  // Étape 2FA : identifiant du facteur TOTP à valider avant d'entrer.
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaPendingUser, setMfaPendingUser] = useState<User | null>(null);
 
   const today = (() => {
     const now = new Date();
@@ -1198,14 +1206,18 @@ export default function AdminPage() {
         return;
       }
 
-      if (!(await isAdminUser(sessionUser.id))) {
-        await rejectNonAdmin();
+      const factorId = await pendingMfaFactor();
+
+      if (cancelled) return;
+
+      if (factorId) {
+        setMfaFactorId(factorId);
+        setMfaPendingUser(sessionUser);
         setLoading(false);
         return;
       }
 
-      setUser(sessionUser);
-      await loadAll();
+      await finishLogin(sessionUser);
       setLoading(false);
     }
 
@@ -1248,18 +1260,111 @@ export default function AdminPage() {
       return;
     }
 
-    if (!(await isAdminUser(data.user.id))) {
-      await rejectNonAdmin();
+    setPassword("");
+
+    const factorId = await pendingMfaFactor();
+
+    if (factorId) {
+      setMfaFactorId(factorId);
+      setMfaPendingUser(data.user);
       setLoginLoading(false);
       return;
     }
 
-    setPassword("");
-    setUser(data.user);
+    await finishLogin(data.user);
+    setLoginLoading(false);
+  }
 
+  /**
+   * Renvoie l'id du facteur TOTP à valider si la session est encore au
+   * niveau aal1 alors que la 2FA est activée, sinon null.
+   */
+  async function pendingMfaFactor() {
+    const { data: aal } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+    if (!aal || aal.nextLevel !== "aal2" || aal.currentLevel === "aal2") {
+      return null;
+    }
+
+    const { data: factors } = await supabase.auth.mfa.listFactors();
+    const totp = factors?.totp.find((f) => f.status === "verified");
+
+    return totp?.id ?? null;
+  }
+
+  /** Vérification admin + chargement des données, une fois la session complète. */
+  async function finishLogin(sessionUser: User) {
+    if (!(await isAdminUser(sessionUser.id))) {
+      await rejectNonAdmin();
+      return;
+    }
+
+    setMfaFactorId(null);
+    setMfaPendingUser(null);
+    setMfaCode("");
+    setUser(sessionUser);
     await loadAll();
+  }
+
+  async function handleMfaVerify(e: React.FormEvent) {
+    e.preventDefault();
+    if (!mfaFactorId || !mfaPendingUser) return;
+
+    setLoginLoading(true);
+    setError("");
+
+    const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
+      factorId: mfaFactorId,
+      code: mfaCode.replace(/\s/g, ""),
+    });
+
+    if (verifyError) {
+      setError("Code incorrect ou expiré.");
+      setLoginLoading(false);
+      return;
+    }
+
+    await finishLogin(mfaPendingUser);
+    setLoginLoading(false);
+  }
+
+  async function cancelMfa() {
+    await supabase.auth.signOut();
+    setMfaFactorId(null);
+    setMfaPendingUser(null);
+    setMfaCode("");
+    setError("");
+  }
+
+  async function handleForgotPassword() {
+    const target = email.trim();
+
+    if (!target) {
+      setError("Saisissez d'abord votre email, puis cliquez sur « Mot de passe oublié ».");
+      return;
+    }
+
+    setError("");
+    setLoginLoading(true);
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      target,
+      { redirectTo: `${SITE_URL}/admin/reset-password` }
+    );
 
     setLoginLoading(false);
+
+    if (resetError) {
+      console.error(resetError);
+      setError("Envoi impossible pour le moment. Réessayez dans quelques minutes.");
+      return;
+    }
+
+    // Même message qu'il existe un compte ou non (évite de révéler les emails).
+    setNotice(
+      "Si un compte administrateur existe pour cet email, un lien de réinitialisation vient d'être envoyé."
+    );
   }
 
   async function logout() {
@@ -1348,6 +1453,56 @@ export default function AdminPage() {
             </p>
           </div>
 
+          {mfaFactorId ? (
+          <form
+            onSubmit={handleMfaVerify}
+            className="rounded-3xl border border-white/10 bg-white/[0.045] p-7 shadow-2xl backdrop-blur-xl"
+          >
+            <div className="mb-7">
+              <h2 className="text-xl font-bold">Double authentification</h2>
+              <p className="mt-1 text-sm text-white/40">
+                Saisissez le code à 6 chiffres de votre application
+                d&apos;authentification.
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              <input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={7}
+                required
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                placeholder="000000"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3.5 text-center text-2xl tracking-[0.5em] outline-none transition placeholder:text-white/15 focus:border-white/30 focus:bg-black/50"
+              />
+
+              {error && (
+                <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loginLoading || mfaCode.replace(/\s/g, "").length < 6}
+                className="w-full rounded-xl bg-white px-4 py-3.5 text-sm font-bold text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loginLoading ? "Vérification..." : "Valider"}
+              </button>
+
+              <button
+                type="button"
+                onClick={cancelMfa}
+                className="w-full text-center text-xs text-white/40 transition hover:text-white"
+              >
+                Annuler et revenir à la connexion
+              </button>
+            </div>
+          </form>
+          ) : (
           <form
             onSubmit={handleLogin}
             className="rounded-3xl border border-white/10 bg-white/[0.045] p-7 shadow-2xl backdrop-blur-xl"
@@ -1406,6 +1561,12 @@ export default function AdminPage() {
                 </div>
               )}
 
+              {notice && (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">
+                  {notice}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loginLoading}
@@ -1415,8 +1576,18 @@ export default function AdminPage() {
                   ? "Connexion..."
                   : "Se connecter"}
               </button>
+
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                disabled={loginLoading}
+                className="w-full text-center text-xs text-white/40 transition hover:text-white disabled:opacity-50"
+              >
+                Mot de passe oublié ?
+              </button>
             </div>
           </form>
+          )}
 
           <p className="mt-6 text-center text-xs text-white/20">
             Chelba Coif • Espace privé
@@ -3227,6 +3398,31 @@ export default function AdminPage() {
 
                       <div className="p-5 sm:p-6">
                         <ClosuresEditor />
+                      </div>
+                    </div>
+
+                    {/* SECURITY */}
+
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                      <div className="border-b border-white/[0.07] p-5 sm:p-6">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
+                            🔒
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold">Sécurité du compte</h4>
+
+                            <p className="mt-0.5 text-xs text-white/30">
+                              Double authentification (2FA) pour l&apos;accès
+                              à cette administration.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 sm:p-6">
+                        <SecurityPanel email={user?.email ?? null} />
                       </div>
                     </div>
 
