@@ -14,6 +14,7 @@ import {
 } from "@/lib/i18n";
 import Image from "next/image";
 import { SmartImage } from "@/components/SmartImage";
+import { ToastViewport, useToasts } from "@/components/Toast";
 import {
   type Barber,
   type BookedSlot,
@@ -86,6 +87,10 @@ export default function Home() {
       localStorage.setItem("lang", lang);
     } catch {}
   }, [lang, dir]);
+
+  const { toasts, notify, dismiss } = useToasts();
+  const [touched, setTouched] = useState({ name: false, phone: false });
+  const [lastWhatsappUrl, setLastWhatsappUrl] = useState("");
 
   const [bookingOpen, setBookingOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -342,18 +347,20 @@ async function loadClosures() {
     return;
   }
 
+  setTouched({ name: true, phone: true });
+
   if (customerName.length > NAME_MAX_LENGTH) {
-    alert(fill(t.alert_name_too_long, { max: NAME_MAX_LENGTH }));
+    notify("error", t.err_name_title, fill(t.alert_name_too_long, { max: NAME_MAX_LENGTH }));
     return;
   }
 
   if (!isValidPhone(customerPhone)) {
-    alert(t.alert_phone);
+    notify("error", t.err_phone_title, t.err_phone_text);
     return;
   }
 
   if (form.date < today || !availableTimeSlots.includes(form.time)) {
-    alert(t.alert_slot_gone);
+    notify("error", t.err_slot_gone_title, t.err_slot_gone_text);
     setForm((prev) => ({ ...prev, time: "" }));
     return;
   }
@@ -378,7 +385,7 @@ async function loadClosures() {
 
   if (freshError) {
     console.error("Error checking slots:", freshError);
-    alert(t.alert_slot_check);
+    notify("error", t.err_check_title, t.err_check_text);
     setSubmitting(false);
     return;
   }
@@ -392,7 +399,7 @@ async function loadClosures() {
   const barber = pickBarber(form.time, fresh);
 
   if (!barber) {
-    alert(t.alert_slot_taken);
+    notify("error", t.err_taken_title, t.err_taken_text);
     setForm((prev) => ({ ...prev, time: "" }));
     setSubmitting(false);
     return;
@@ -414,12 +421,17 @@ async function loadClosures() {
     console.error("Error creating appointment:", error);
 
     if (error.code === "23505") {
-      alert(t.alert_slot_taken);
+      notify("error", t.err_taken_title, t.err_taken_text);
       setForm((prev) => ({ ...prev, time: "" }));
       return;
     }
 
-    alert(t.alert_generic);
+    if (error.code === "23514" || error.message.includes("Trop de réservations")) {
+      notify("error", t.err_limit_title, t.err_limit_text);
+      return;
+    }
+
+    notify("error", t.err_generic_title, t.err_generic_text);
     return;
   }
 
@@ -438,10 +450,17 @@ async function loadClosures() {
   ""
 )}?text=${encodeURIComponent(message)}`;
 
-  window.open(whatsappUrl, "_blank");
-
+  setLastWhatsappUrl(whatsappUrl);
   setAssignedBarber(barber.name);
   setConfirmed(true);
+  setTouched({ name: false, phone: false });
+
+  const opened = window.open(whatsappUrl, "_blank");
+  notify(
+    "success",
+    t.ok_booking_title,
+    opened ? t.ok_booking_text : t.ok_booking_text_blocked
+  );
 }
 
   const selectedService = services.find(
@@ -462,6 +481,17 @@ async function loadClosures() {
     : null;
   const closure = form.date ? findClosure(closures, form.date) : null;
   const dayClosed = Boolean(form.date) && (!daySchedule || Boolean(closure));
+
+  const nameError = !form.name.trim()
+    ? t.field_name_required
+    : form.name.trim().length > NAME_MAX_LENGTH
+    ? fill(t.alert_name_too_long, { max: NAME_MAX_LENGTH })
+    : "";
+  const phoneError = !form.phone.trim()
+    ? t.field_phone_required
+    : !isValidPhone(form.phone)
+    ? t.field_phone_invalid
+    : "";
 
   /** Créneaux libres d'un barbier donné. */
   function slotsFor(barberId: number, booked: BookedSlot[] = bookedAppointments) {
@@ -524,7 +554,7 @@ async function loadClosures() {
 
   if (error) {
     console.error("Error submitting review:", error);
-    alert(t.alert_generic);
+    notify("error", t.err_review_title, t.err_review_text);
     return;
   }
 
@@ -541,6 +571,7 @@ async function loadClosures() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#0b0b0b] text-white selection:bg-white selection:text-black">
+      <ToastViewport toasts={toasts} onDismiss={dismiss} closeLabel={t.close} />
       {/* NAVBAR */}
       <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-5">
         <nav className="mx-auto flex max-w-7xl items-center justify-between rounded-2xl border border-white/10 bg-black/70 px-4 py-3 shadow-2xl shadow-black/20 backdrop-blur-2xl sm:rounded-full sm:px-6">
@@ -1457,15 +1488,29 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                         <span className="text-white/35">{t.sum_price}</span>
 
                         <span className="font-black">
-                          {selectedService?.price}
+                          {selectedService?.price} {t.currency}
                         </span>
                       </div>
                     </div>
                   </div>
 
+                  {lastWhatsappUrl && (
+                    <a
+                      href={lastWhatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl bg-[#25D366] py-4 text-sm font-black text-black transition hover:scale-[1.02]"
+                    >
+                      <MessageCircle size={18} />
+                      {t.open_whatsapp}
+                    </a>
+                  )}
+
+                  <p className="mt-3 text-xs leading-5 text-white/35">{t.open_whatsapp_hint}</p>
+
                   <button
                     onClick={closeBooking}
-                    className="mt-6 w-full rounded-xl bg-white py-4 text-sm font-black text-black transition hover:scale-[1.02] hover:bg-white/90"
+                    className="mt-4 w-full rounded-xl border border-white/15 py-4 text-sm font-black text-white transition hover:bg-white/10"
                   >
                     {t.finish}
                   </button>
@@ -1773,9 +1818,16 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                               name: e.target.value,
                             })
                           }
+                          onBlur={() => setTouched((v) => ({ ...v, name: true }))}
+                          aria-invalid={touched.name && Boolean(nameError)}
                           required
-                          className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/40"
+                          className={`w-full rounded-xl border bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/40 ${
+                            touched.name && nameError ? "border-red-400/60" : "border-white/10"
+                          }`}
                         />
+                        {touched.name && nameError && (
+                          <p className="mt-2 text-xs font-semibold text-red-400">{nameError}</p>
+                        )}
                       </div>
 
                       <div>
@@ -1798,9 +1850,16 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                               phone: e.target.value,
                             })
                           }
+                          onBlur={() => setTouched((v) => ({ ...v, phone: true }))}
+                          aria-invalid={touched.phone && Boolean(phoneError)}
                           required
-                          className="w-full rounded-xl border border-white/10 bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/40"
+                          className={`w-full rounded-xl border bg-[#0d0d0d] px-4 py-4 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/40 ${
+                            touched.phone && phoneError ? "border-red-400/60" : "border-white/10"
+                          }`}
                         />
+                        {touched.phone && phoneError && (
+                          <p className="mt-2 text-xs font-semibold text-red-400">{phoneError}</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1833,7 +1892,7 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                             </div>
 
                             <span className="text-lg font-black">
-                              {selectedService?.price}
+                              {selectedService?.price} {t.currency}
                             </span>
                           </div>
 
