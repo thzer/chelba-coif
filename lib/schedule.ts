@@ -29,7 +29,14 @@ export type BookedSlot = {
   duration: number;
 };
 
-export type Barber = { id: number; name: string; active: boolean; sort_order: number };
+export type Barber = {
+  id: number;
+  name: string;
+  active: boolean;
+  sort_order: number;
+  photo_url: string | null;
+  bio: string | null;
+};
 
 /** Créneaux d'un barbier précis (les RDV sans barbier bloquent tout le monde). */
 export function slotsForBarber(booked: BookedSlot[], barberId: number) {

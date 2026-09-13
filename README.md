@@ -65,7 +65,9 @@ suivent automatiquement.
 
 - Plusieurs coiffeurs : le client choisit le sien (ou « Sans préférence » →
   premier disponible). Chaque coiffeur a son propre planning ; un créneau
-  est unique par coiffeur. Gestion dans *Admin → Paramètres → Coiffeurs*.
+  est unique par coiffeur. Section « Nos coiffeurs » sur le site (photo,
+  description, bouton « Réserver avec … »). Gestion (photo, nom,
+  description, activation) dans *Admin → Paramètres → Coiffeurs*.
   Les horaires sont communs à tous les coiffeurs.
 - Les horaires, la pause, l'intervalle des créneaux et les fermetures
   exceptionnelles se règlent dans *Admin → Paramètres*. Les créneaux proposés

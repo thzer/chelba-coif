@@ -26,6 +26,7 @@ const fr = {
   // Navigation
   nav_services: "Services",
   nav_about: "À propos",
+  nav_team: "Équipe",
   nav_gallery: "Galerie",
   nav_reviews: "Avis",
   nav_reviews_long: "Avis clients",
@@ -71,6 +72,13 @@ const fr = {
   exp_stat_services: "Prestations",
   exp_stat_passion: "Passion",
   exp_img_alt: "Expérience barber",
+
+  // Team
+  team_tag: "L'équipe",
+  team_h: "Nos coiffeurs",
+  team_p: "Deux barbiers, un même niveau d'exigence. Choisissez le vôtre et réservez directement avec lui.",
+  team_role: "Barbier",
+  book_with: "Réserver avec {name}",
 
   // Gallery
   gallery_tag: "Inspiration",
@@ -190,6 +198,7 @@ export type Dictionary = typeof fr;
 const en: Dictionary = {
   nav_services: "Services",
   nav_about: "About",
+  nav_team: "Team",
   nav_gallery: "Gallery",
   nav_reviews: "Reviews",
   nav_reviews_long: "Customer reviews",
@@ -231,6 +240,12 @@ const en: Dictionary = {
   exp_stat_services: "Services",
   exp_stat_passion: "Passion",
   exp_img_alt: "Barber experience",
+
+  team_tag: "The team",
+  team_h: "Our barbers",
+  team_p: "Two barbers, one standard of excellence. Pick yours and book directly with him.",
+  team_role: "Barber",
+  book_with: "Book with {name}",
 
   gallery_tag: "Inspiration",
   gallery_h: "Gallery",
@@ -342,6 +357,7 @@ const en: Dictionary = {
 const ar: Dictionary = {
   nav_services: "الخدمات",
   nav_about: "من نحن",
+  nav_team: "الفريق",
   nav_gallery: "المعرض",
   nav_reviews: "الآراء",
   nav_reviews_long: "آراء الزبائن",
@@ -382,6 +398,12 @@ const ar: Dictionary = {
   exp_stat_services: "خدمات",
   exp_stat_passion: "شغف",
   exp_img_alt: "تجربة الحلاقة",
+
+  team_tag: "الفريق",
+  team_h: "حلاقونا",
+  team_p: "حلاقان، ونفس مستوى الإتقان. اختر حلاقك واحجز معه مباشرة.",
+  team_role: "حلاق",
+  book_with: "احجز مع {name}",
 
   gallery_tag: "إلهام",
   gallery_h: "المعرض",

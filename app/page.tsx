@@ -252,7 +252,7 @@ async function loadClosures() {
   useEffect(() => {
     supabase
       .from("barbers")
-      .select("id, name, active, sort_order")
+      .select("id, name, active, sort_order, photo_url, bio")
       .eq("active", true)
       .order("sort_order")
       .order("id")
@@ -306,10 +306,11 @@ async function loadClosures() {
     loadBookedAppointments();
   }, [form.date]);
 
-  function openBooking(service = "") {
+  function openBooking(service = "", barber = "") {
     setForm((prev) => ({
       ...prev,
-      service,
+      service: service || prev.service,
+      barber: barber || prev.barber,
       time: "",
     }));
 
@@ -562,6 +563,7 @@ async function loadClosures() {
             {[
               ["services", t.nav_services],
               ["experience", t.nav_about],
+              ["team", t.nav_team],
               ["gallery", t.nav_gallery],
               ["reviews", t.nav_reviews],
               ["contact", t.nav_contact],
@@ -635,6 +637,7 @@ async function loadClosures() {
               {[
                 ["services", t.nav_services],
                 ["experience", t.nav_about],
+                ["team", t.nav_team],
                 ["gallery", t.nav_gallery],
                 ["reviews", t.nav_reviews_long],
                 ["contact", t.nav_contact],
@@ -885,6 +888,77 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               <ArrowUpRight size={18} />
             </button>
           </div>
+        </div>
+      </section>
+
+      {/* TEAM */}
+      <section id="team" className="mx-auto max-w-7xl px-5 py-20 sm:px-6 sm:py-28">
+        <div className="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+          <div>
+            <p className="mb-4 text-xs font-bold uppercase tracking-[0.3em] text-white/35">
+              {t.team_tag}
+            </p>
+
+            <h2 className="text-4xl font-black uppercase tracking-tight sm:text-6xl">
+              {t.team_h}
+            </h2>
+          </div>
+
+          <p className="max-w-md text-sm leading-7 text-white/45">
+            {t.team_p}
+          </p>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          {barbers.map((barber, index) => (
+            <motion.div
+              key={barber.id}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.45, delay: index * 0.08 }}
+              className="group grid overflow-hidden rounded-3xl border border-white/10 bg-[#141414] sm:grid-cols-[220px_1fr]"
+            >
+              <div className="relative h-72 sm:h-full sm:min-h-[300px]">
+                {barber.photo_url ? (
+                  <SmartImage
+                    src={safeHttpUrl(barber.photo_url) ?? ""}
+                    alt={barber.name}
+                    sizes="(min-width: 640px) 220px, 100vw"
+                    className="object-cover transition duration-700 ease-out group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/[0.08] to-white/[0.02] text-7xl font-black text-white/20">
+                    {barber.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent sm:bg-gradient-to-r" />
+              </div>
+
+              <div className="flex flex-col justify-center p-7 sm:p-8">
+                <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/35">
+                  {t.team_role}
+                </p>
+
+                <h3 className="mt-3 text-3xl font-black uppercase leading-none">
+                  {barber.name}
+                </h3>
+
+                {barber.bio && (
+                  <p className="mt-4 max-w-sm leading-7 text-white/50">{barber.bio}</p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => openBooking("", String(barber.id))}
+                  className="mt-7 inline-flex w-fit items-center gap-3 whitespace-nowrap rounded-full bg-white px-6 py-3.5 text-sm font-bold text-black transition hover:scale-105"
+                >
+                  {fill(t.book_with, { name: barber.name })}
+                  <ArrowUpRight size={17} />
+                </button>
+              </div>
+            </motion.div>
+          ))}
         </div>
       </section>
 

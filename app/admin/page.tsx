@@ -19,6 +19,12 @@ import { AgendaView } from "@/components/admin/AgendaView";
 import { InsightsPanel } from "@/components/admin/InsightsPanel";
 import { SecurityPanel } from "@/components/admin/SecurityPanel";
 import { BarbersEditor } from "@/components/admin/BarbersEditor";
+import {
+  IMAGE_EXTENSIONS,
+  buildStorageFileName,
+  storagePathFromPublicUrl,
+  validateImageFile,
+} from "@/lib/images";
 import { SITE_URL } from "@/lib/site";
 import { type ClientMessageKind, clientMessages, whatsappUrl } from "@/lib/whatsapp";
 
@@ -79,45 +85,6 @@ type Review = {
   active: boolean;
   created_at: string;
 };
-
-const IMAGE_EXTENSIONS: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-
-const STORAGE_PUBLIC_MARKER = "/storage/v1/object/public/gallery/";
-
-/** Chemin dans le bucket `gallery` à partir d'une URL publique, sinon null. */
-function storagePathFromPublicUrl(url: string | null | undefined) {
-  if (!url) return null;
-
-  const index = url.indexOf(STORAGE_PUBLIC_MARKER);
-
-  return index === -1
-    ? null
-    : url.substring(index + STORAGE_PUBLIC_MARKER.length);
-}
-
-function buildStorageFileName(file: File) {
-  return `${Date.now()}-${Math.random().toString(36).substring(2)}.${
-    IMAGE_EXTENSIONS[file.type]
-  }`;
-}
-
-function validateImageFile(file: File) {
-  if (!IMAGE_EXTENSIONS[file.type]) {
-    return "Format non supporté. Utilisez une image JPG, PNG ou WebP.";
-  }
-
-  if (file.size > MAX_IMAGE_SIZE) {
-    return "L'image ne doit pas dépasser 5 MB.";
-  }
-
-  return null;
-}
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -418,7 +385,7 @@ export default function AdminPage() {
   async function loadBarbers() {
     const { data, error } = await supabase
       .from("barbers")
-      .select("id, name, active, sort_order")
+      .select("id, name, active, sort_order, photo_url, bio")
       .order("sort_order")
       .order("id");
 

@@ -72,6 +72,8 @@ create table if not exists public.barbers (
   name text not null check (length(btrim(name)) between 1 and 60),
   active boolean not null default true,
   sort_order integer not null default 0,
+  photo_url text,
+  bio text check (bio is null or length(bio) <= 160),
   created_at timestamptz not null default now()
 );
 alter table public.barbers enable row level security;
