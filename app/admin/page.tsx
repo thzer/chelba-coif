@@ -19,6 +19,8 @@ import { AgendaView } from "@/components/admin/AgendaView";
 import { InsightsPanel } from "@/components/admin/InsightsPanel";
 import { SecurityPanel } from "@/components/admin/SecurityPanel";
 import { BarbersEditor } from "@/components/admin/BarbersEditor";
+import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
+import { ToastViewport, useToasts } from "@/components/Toast";
 import {
   IMAGE_EXTENSIONS,
   buildStorageFileName,
@@ -88,6 +90,7 @@ type Review = {
 
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
+  const { toasts, notify, dismiss } = useToasts(8000);
   const [loading, setLoading] = useState(true);
 
   const [section, setSection] = useState<Section>("dashboard");
@@ -1259,6 +1262,41 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Temps réel : bandeau + liste actualisée quand une réservation arrive
+  // pendant que l'admin est ouvert.
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel("admin-appointments")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "appointments" },
+        (payload) => {
+          const row = payload.new as { customer_name?: string; appointment_date?: string; appointment_time?: string };
+          const when = row.appointment_date
+            ? new Date(`${row.appointment_date}T12:00:00`).toLocaleDateString("fr-FR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+              })
+            : "";
+          notify(
+            "info",
+            "🔔 Nouvelle réservation",
+            `${row.customer_name ?? "Client"} — ${when} à ${(row.appointment_time ?? "").slice(0, 5)}`
+          );
+          loadAppointments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
 
@@ -1620,6 +1658,7 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-[#070707] text-white">
+      <ToastViewport toasts={toasts} onDismiss={dismiss} />
       <div className="flex min-h-screen overflow-x-hidden">
 
         {/* =========================
@@ -3479,6 +3518,31 @@ export default function AdminPage() {
 
                       <div className="p-5 sm:p-6">
                         <ClosuresEditor />
+                      </div>
+                    </div>
+
+                    {/* NOTIFICATIONS */}
+
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                      <div className="border-b border-white/[0.07] p-5 sm:p-6">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
+                            🔔
+                          </div>
+
+                          <div>
+                            <h4 className="font-bold">Notifications</h4>
+
+                            <p className="mt-0.5 text-xs text-white/30">
+                              Soyez prévenu sur votre téléphone à chaque
+                              nouvelle réservation.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-5 sm:p-6">
+                        {user && <NotificationsPanel userId={user.id} />}
                       </div>
                     </div>
 

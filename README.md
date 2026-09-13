@@ -29,6 +29,9 @@ Variables d'environnement (voir `.env.example`) :
 | `NEXT_PUBLIC_SUPABASE_URL`      | URL du projet Supabase                                      |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clé publique `anon` (jamais la `service_role`)              |
 | `NEXT_PUBLIC_SITE_URL`          | URL publique du site (SEO : sitemap, robots, Open Graph)    |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`  | Clé publique VAPID (notifications push admin)               |
+| `VAPID_PRIVATE_KEY`             | Clé privée VAPID — serveur uniquement                       |
+| `BOOKING_WEBHOOK_SECRET`        | Secret partagé base → `/api/notify-booking` (aussi dans Vault) |
 
 ## Base de données et sécurité
 
@@ -73,9 +76,14 @@ suivent automatiquement.
   exceptionnelles se règlent dans *Admin → Paramètres*. Les créneaux proposés
   tiennent compte de la durée réelle de chaque service.
 - Une réservation est enregistrée « en attente » puis WhatsApp s'ouvre
-  pré-rempli côté client. Aucune notification automatique n'est envoyée au
-  salon : les demandes se consultent dans l'admin. Confirmer ou annuler un
-  RDV ouvre WhatsApp avec un message prêt pour le client.
+  pré-rempli côté client. Le salon reçoit une **notification push** sur
+  chaque appareil activé dans *Admin → Paramètres → Notifications* (trigger
+  `notify_new_booking` → pg_net → `/api/notify-booking` → web-push), et un
+  bandeau temps réel si l'admin est ouvert. Confirmer ou annuler un RDV ouvre
+  WhatsApp avec un message prêt pour le client.
+- Sur iPhone, les notifications exigent d'ajouter l'admin à l'écran d'accueil
+  (manifest PWA fourni). Les secrets `site_url` et `booking_webhook_secret`
+  sont dans *Supabase → Vault* ; à mettre à jour si le domaine change.
 - Double authentification (application TOTP) activable dans *Admin →
   Paramètres → Sécurité*. Une fois activée, `is_admin()` exige une session
   validée par un code : la protection est appliquée par la base, pas
