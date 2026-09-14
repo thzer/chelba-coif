@@ -21,6 +21,7 @@ import { SecurityPanel } from "@/components/admin/SecurityPanel";
 import { BarbersEditor } from "@/components/admin/BarbersEditor";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { RemindersPanel } from "@/components/admin/RemindersPanel";
+import { FinancePanel } from "@/components/admin/FinancePanel";
 import { ToastViewport, useToasts } from "@/components/Toast";
 import {
   IMAGE_EXTENSIONS,
@@ -49,10 +50,12 @@ type Appointment = {
   barber_id: number | null;
   cancel_token: string | null;
   client_reminder_sent_at?: string | null;
+  cancelled_by?: string | null;
   services: {
     name: string;
     duration: number | null;
     price: number;
+    cost?: number | null;
   }[] | null;
   barbers: { name: string }[] | null;
 };
@@ -73,6 +76,7 @@ type Service = {
   duration: number | null;
   image_url: string | null;
   active: boolean;
+  cost?: number | null;
 };
 
 type GalleryImage = {
@@ -146,6 +150,7 @@ export default function AdminPage() {
   const [serviceDescription, setServiceDescription] = useState("");
   const [servicePrice, setServicePrice] = useState("");
   const [serviceDuration, setServiceDuration] = useState("");
+  const [serviceCost, setServiceCost] = useState("");
   const [serviceImage, setServiceImage] = useState("");
   const [uploadingServiceImage, setUploadingServiceImage] = useState(false);
 
@@ -373,10 +378,12 @@ export default function AdminPage() {
         barber_id,
         cancel_token,
         client_reminder_sent_at,
+        cancelled_by,
         services (
           name,
           duration,
-          price
+          price,
+          cost
         ),
         barbers (
           name
@@ -406,7 +413,7 @@ export default function AdminPage() {
   async function loadBarbers() {
     const { data, error } = await supabase
       .from("barbers")
-      .select("id, name, active, sort_order, photo_url, bio")
+      .select("id, name, active, sort_order, photo_url, bio, commission_pct")
       .order("sort_order")
       .order("id");
 
@@ -472,6 +479,7 @@ export default function AdminPage() {
     setServiceDescription("");
     setServicePrice("");
     setServiceDuration("");
+    setServiceCost("");
     setServiceImage("");
     setOriginalServiceImage("");
     setPendingServiceImagePath(null);
@@ -585,11 +593,19 @@ export default function AdminPage() {
       return;
     }
 
+    const cost = serviceCost ? Number(serviceCost) : 0;
+
+    if (!Number.isFinite(cost) || cost < 0 || cost > price) {
+      alert("Le coût produits doit être un nombre entre 0 et le prix du service.");
+      return;
+    }
+
     const serviceData = {
       name,
       description: serviceDescription.trim().slice(0, 500) || null,
       price,
       duration,
+      cost,
       image_url: imageUrl || null,
     };
 
@@ -1889,6 +1905,15 @@ export default function AdminPage() {
                         Bonjour 👋
                       </h3>
 
+                      <p className="mt-1 text-sm capitalize text-white/50">
+                        {new Date().toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+
                       <p className="mt-2 max-w-xl text-sm text-white/40">
                         Gérez facilement les rendez-vous,
                         services, avis et contenu de votre salon.
@@ -1998,6 +2023,12 @@ export default function AdminPage() {
                 {/* INSIGHTS */}
 
                 <InsightsPanel appointments={appointments} />
+
+                {/* FINANCES */}
+
+                <div className="mt-8">
+                  <FinancePanel appointments={appointments} barbers={barbers} />
+                </div>
 
                 {/* RECENT APPOINTMENTS */}
 
@@ -2552,6 +2583,27 @@ export default function AdminPage() {
                           </div>
                         </FormField>
 
+                        <FormField label="Coût produits (optionnel)">
+                          <div className="relative">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              inputMode="decimal"
+                              value={serviceCost}
+                              onChange={(e) => setServiceCost(e.target.value)}
+                              placeholder="0"
+                              className={`${inputClass} pr-12`}
+                            />
+                            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-white/30">
+                              DT
+                            </span>
+                          </div>
+                          <p className="mt-1.5 text-[11px] text-white/30">
+                            Produits consommés par prestation (cire, lames…), déduits pour la marge.
+                          </p>
+                        </FormField>
+
                         <div className="md:col-span-2">
                           <FormField label="Image">
                             <div className="flex flex-col gap-4 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-4 sm:flex-row sm:items-center">
@@ -2697,6 +2749,9 @@ export default function AdminPage() {
                                     service.duration
                                   )
                                 : ""
+                            );
+                            setServiceCost(
+                              service.cost ? String(service.cost) : ""
                             );
                             setServiceImage(
                               service.image_url ??

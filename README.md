@@ -89,6 +89,20 @@ suivent automatiquement.
   validée par un code : la protection est appliquée par la base, pas
   seulement par l'interface. En cas de perte du téléphone : supprimer le
   facteur dans *Supabase → Authentication → Users → MFA*.
+- **Annulation par le client** : chaque réservation a un jeton secret
+  (`cancel_token`) → page `/rdv/<jeton>` (détails, annulation jusqu'à 2 h
+  avant, opt-in rappel). Le lien est affiché à la confirmation et inclus dans
+  le WhatsApp de confirmation du barbier. Une annulation client notifie le salon.
+- **Rappels automatiques** (pg_cron toutes les 15 min → `run_reminders()` →
+  `/api/reminders`) : push au client 24 h avant s'il a activé le rappel,
+  push au barbier 30 min avant, récap à 08:00. *Admin → Rendez-vous → Rappels*
+  liste les rappels WhatsApp à envoyer à la main.
+- **Téléphones** normalisés au format international (`lib/phone.ts`), avec
+  écran de confirmation du numéro avant l'envoi.
+- **Finances** (tableau de bord) : CA, coût produits (`services.cost`),
+  commissions (`barbers.commission_pct`), dépenses (`expenses`), marge nette,
+  par période et par coiffeur. Seuls les RDV **terminés** comptent : pensez à
+  cliquer « Terminer » après chaque prestation.
 - Traductions du site public : `lib/i18n.ts`. L'administration reste en
   français.
 

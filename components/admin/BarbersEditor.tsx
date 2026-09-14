@@ -150,8 +150,8 @@ export function BarbersEditor({ barbers, onChange }: Props) {
             key={barber.id}
             barber={barber}
             busy={busyId === barber.id}
-            onSaveText={(name, bio) =>
-              update(barber, { name, bio }, "Impossible d'enregistrer ce coiffeur.")
+            onSaveText={(name, bio, commission_pct) =>
+              update(barber, { name, bio, commission_pct }, "Impossible d'enregistrer ce coiffeur.")
             }
             onPhoto={(e) => changePhoto(barber, e)}
             onRemovePhoto={() => removePhoto(barber)}
@@ -192,7 +192,7 @@ function BarberCard({
 }: {
   barber: Barber;
   busy: boolean;
-  onSaveText: (name: string, bio: string | null) => Promise<boolean>;
+  onSaveText: (name: string, bio: string | null, commission_pct: number) => Promise<boolean>;
   onPhoto: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemovePhoto: () => void;
   onToggle: () => void;
@@ -200,8 +200,13 @@ function BarberCard({
 }) {
   const [name, setName] = useState(barber.name);
   const [bio, setBio] = useState(barber.bio ?? "");
+  const [commission, setCommission] = useState(String(barber.commission_pct ?? 0));
 
-  const dirty = name.trim() !== barber.name || (bio.trim() || null) !== (barber.bio ?? null);
+  const commissionValue = Math.min(100, Math.max(0, Number(commission) || 0));
+  const dirty =
+    name.trim() !== barber.name ||
+    (bio.trim() || null) !== (barber.bio ?? null) ||
+    commissionValue !== Number(barber.commission_pct ?? 0);
 
   return (
     <div
@@ -243,6 +248,20 @@ function BarberCard({
               {bio.length}/{BIO_MAX}
             </p>
           </div>
+
+          <label className="flex items-center gap-2 text-xs text-white/50">
+            <span className="shrink-0">Commission</span>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={commission}
+              onChange={(e) => setCommission(e.target.value)}
+              className={`${inputClass} w-20 py-1.5 text-center`}
+            />
+            <span>% du prix de chaque prestation reversé au coiffeur (pour le calcul de la marge)</span>
+          </label>
         </div>
       </div>
 
@@ -277,7 +296,7 @@ function BarberCard({
           <button
             type="button"
             disabled={busy || !name.trim()}
-            onClick={() => onSaveText(name.trim(), bio.trim() || null)}
+            onClick={() => onSaveText(name.trim(), bio.trim() || null, commissionValue)}
             className="rounded-lg bg-emerald-400/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-400/25 disabled:opacity-50"
           >
             ✓ Enregistrer
