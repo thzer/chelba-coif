@@ -10,6 +10,7 @@ import webpush from "web-push";
 export const runtime = "nodejs";
 
 type Payload = {
+  kind?: "new" | "cancelled";
   appointment: {
     id: number;
     customer_name: string;
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
   }
 
   const { appointment, subscriptions } = payload;
+  const kind = payload.kind ?? "new";
   if (!appointment || !Array.isArray(subscriptions)) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
@@ -61,13 +63,15 @@ export async function POST(request: Request) {
     { weekday: "long", day: "numeric", month: "long" }
   );
 
+  const details = `${appointment.customer_name} — ${date} à ${appointment.appointment_time}${
+    appointment.service ? ` · ${appointment.service}` : ""
+  }${appointment.barber ? ` · avec ${appointment.barber}` : ""}`;
+
   const notification = JSON.stringify({
-    title: "🔔 Nouvelle réservation",
-    body: `${appointment.customer_name} — ${date} à ${appointment.appointment_time}${
-      appointment.service ? ` · ${appointment.service}` : ""
-    }${appointment.barber ? ` · avec ${appointment.barber}` : ""}`,
+    title: kind === "cancelled" ? "❌ Annulation par le client" : "🔔 Nouvelle réservation",
+    body: kind === "cancelled" ? `Créneau libéré : ${details}` : details,
     url: "/admin",
-    tag: `booking-${appointment.id}`,
+    tag: `booking-${appointment.id}-${kind}`,
   });
 
   const results = await Promise.allSettled(

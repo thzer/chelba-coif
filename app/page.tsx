@@ -16,6 +16,8 @@ import Image from "next/image";
 import { SmartImage } from "@/components/SmartImage";
 import { ToastViewport, useToasts } from "@/components/Toast";
 import { type PhoneCheck, checkPhone } from "@/lib/phone";
+import { ReminderOptIn } from "@/components/ReminderOptIn";
+import { SITE_URL } from "@/lib/site";
 import {
   type Barber,
   type BookedSlot,
@@ -91,6 +93,8 @@ export default function Home() {
   const [touched, setTouched] = useState({ name: false, phone: false });
   const [phoneConfirm, setPhoneConfirm] = useState<PhoneCheck | null>(null);
   const [lastWhatsappUrl, setLastWhatsappUrl] = useState("");
+  const [lastToken, setLastToken] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [bookingOpen, setBookingOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -420,6 +424,9 @@ async function submitBooking(confirmedPhone: boolean) {
     return;
   }
 
+  // Jeton secret connu du client seul : sert au lien « Gérer mon rendez-vous ».
+  const cancelToken = crypto.randomUUID();
+
   const { error } = await supabase.from("appointments").insert({
     customer_name: customerName,
     phone: customerPhone,
@@ -428,6 +435,7 @@ async function submitBooking(confirmedPhone: boolean) {
     appointment_date: form.date,
     appointment_time: form.time,
     status: "pending",
+    cancel_token: cancelToken,
   });
 
   setSubmitting(false);
@@ -466,6 +474,8 @@ async function submitBooking(confirmedPhone: boolean) {
 )}?text=${encodeURIComponent(message)}`;
 
   setLastWhatsappUrl(whatsappUrl);
+  setLastToken(cancelToken);
+  setLinkCopied(false);
   setAssignedBarber(barber.name);
   setConfirmed(true);
   setTouched({ name: false, phone: false });
@@ -1566,6 +1576,40 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                       </div>
                     </div>
                   </div>
+
+                  {lastToken && (
+                    <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5 text-start">
+                      <p className="text-sm font-bold">{t.manage_link_title}</p>
+                      <p className="mt-1 text-xs leading-5 text-white/45">{t.manage_link_text}</p>
+
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <a
+                          href={`/rdv/${lastToken}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 rounded-xl border border-white/15 py-3 text-center text-sm font-semibold transition hover:bg-white/10"
+                        >
+                          {t.manage_link_open}
+                        </a>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(`${SITE_URL}/rdv/${lastToken}`);
+                              setLinkCopied(true);
+                            } catch {
+                              notify("info", t.manage_link_title, `${SITE_URL}/rdv/${lastToken}`);
+                            }
+                          }}
+                          className="flex-1 rounded-xl border border-white/15 py-3 text-center text-sm font-semibold transition hover:bg-white/10"
+                        >
+                          {linkCopied ? `✓ ${t.manage_link_copied}` : t.manage_link_copy}
+                        </button>
+                      </div>
+
+                      <ReminderOptIn token={lastToken} t={t} notify={notify} compact />
+                    </div>
+                  )}
 
                   {lastWhatsappUrl && (
                     <a

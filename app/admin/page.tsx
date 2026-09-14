@@ -20,6 +20,7 @@ import { InsightsPanel } from "@/components/admin/InsightsPanel";
 import { SecurityPanel } from "@/components/admin/SecurityPanel";
 import { BarbersEditor } from "@/components/admin/BarbersEditor";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
+import { RemindersPanel } from "@/components/admin/RemindersPanel";
 import { ToastViewport, useToasts } from "@/components/Toast";
 import {
   IMAGE_EXTENSIONS,
@@ -46,6 +47,8 @@ type Appointment = {
   appointment_time: string;
   status: string;
   barber_id: number | null;
+  cancel_token: string | null;
+  client_reminder_sent_at?: string | null;
   services: {
     name: string;
     duration: number | null;
@@ -93,7 +96,12 @@ export default function AdminPage() {
   const { toasts, notify, dismiss } = useToasts(8000);
   const [loading, setLoading] = useState(true);
 
-  const [section, setSection] = useState<Section>("dashboard");
+  const [section, setSection] = useState<Section>(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "reminders") {
+      return "appointments";
+    }
+    return "dashboard";
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   /* =========================
@@ -109,7 +117,15 @@ export default function AdminPage() {
   const [appointmentBarberFilter, setAppointmentBarberFilter] = useState("all");
   const [agendaBarberId, setAgendaBarberId] = useState<number | null>(null);
   const [barbers, setBarbers] = useState<Barber[]>([]);
-  const [appointmentView, setAppointmentView] = useState<"list" | "agenda">("list");
+  const [appointmentView, setAppointmentView] = useState<"list" | "agenda" | "reminders">(
+    () => {
+      // Le récap du matin ouvre directement les rappels (/admin?view=reminders).
+      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "reminders") {
+        return "reminders";
+      }
+      return "list";
+    }
+  );
   const [agendaDate, setAgendaDate] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -355,6 +371,8 @@ export default function AdminPage() {
         appointment_time,
         status,
         barber_id,
+        cancel_token,
+        client_reminder_sent_at,
         services (
           name,
           duration,
@@ -657,6 +675,7 @@ export default function AdminPage() {
             service: appointment.services?.[0]?.name,
             barber: appointment.barbers?.[0]?.name,
             shopName: settings.shop_name,
+            manageUrl: appointment.cancel_token ? `${SITE_URL}/rdv/${appointment.cancel_token}` : null,
           })
         );
 
@@ -2098,6 +2117,7 @@ export default function AdminPage() {
                     [
                       ["list", "☰ Liste"],
                       ["agenda", "▦ Agenda du jour"],
+                      ["reminders", "🔔 Rappels"],
                     ] as const
                   ).map(([view, label]) => (
                     <button
@@ -2149,6 +2169,14 @@ export default function AdminPage() {
                     statusClass={getStatusClassStatic}
                   />
                   </>
+                )}
+
+                {appointmentView === "reminders" && (
+                  <RemindersPanel
+                    appointments={appointments}
+                    siteUrl={SITE_URL}
+                    shopName={settings.shop_name}
+                  />
                 )}
 
                 {appointmentView === "list" && (<>
@@ -3947,6 +3975,7 @@ function AppointmentCard({
           appointment_time: appointment.appointment_time,
           service: service?.name,
           barber: appointment.barbers?.[0]?.name,
+          manageUrl: appointment.cancel_token ? `${SITE_URL}/rdv/${appointment.cancel_token}` : null,
         })
       : undefined
   );
@@ -3961,6 +3990,7 @@ function AppointmentCard({
             appointment_time: appointment.appointment_time,
             service: service?.name,
             barber: appointment.barbers?.[0]?.name,
+            manageUrl: appointment.cancel_token ? `${SITE_URL}/rdv/${appointment.cancel_token}` : null,
           })
         )
       : null;
