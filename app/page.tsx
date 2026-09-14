@@ -15,6 +15,7 @@ import {
 import Image from "next/image";
 import { SmartImage } from "@/components/SmartImage";
 import { ToastViewport, useToasts } from "@/components/Toast";
+import { type PhoneCheck, checkPhone } from "@/lib/phone";
 import {
   type Barber,
   type BookedSlot,
@@ -47,10 +48,8 @@ import {
 
 
 const NAME_MAX_LENGTH = 80;
-const PHONE_PATTERN = /^\+?[0-9 .-]{8,20}$/;
-
 function isValidPhone(value: string) {
-  return PHONE_PATTERN.test(value.trim());
+  return checkPhone(value).ok;
 }
 
 export default function Home() {
@@ -90,6 +89,7 @@ export default function Home() {
 
   const { toasts, notify, dismiss } = useToasts();
   const [touched, setTouched] = useState({ name: false, phone: false });
+  const [phoneConfirm, setPhoneConfirm] = useState<PhoneCheck | null>(null);
   const [lastWhatsappUrl, setLastWhatsappUrl] = useState("");
 
   const [bookingOpen, setBookingOpen] = useState(false);
@@ -331,9 +331,17 @@ async function loadClosures() {
 
  async function handleSubmit(e: React.FormEvent) {
   e.preventDefault();
+  await submitBooking(false);
+}
 
+/**
+ * `confirmedPhone` = false : valide et affiche l'écran « Confirmez votre
+ * numéro ». true : le client a confirmé, on enregistre.
+ */
+async function submitBooking(confirmedPhone: boolean) {
   const customerName = form.name.trim();
-  const customerPhone = form.phone.trim();
+  const phoneCheck = checkPhone(form.phone);
+  const customerPhone = phoneCheck.ok ? phoneCheck.e164 : form.phone.trim();
 
   if (
     submitting ||
@@ -354,7 +362,7 @@ async function loadClosures() {
     return;
   }
 
-  if (!isValidPhone(customerPhone)) {
+  if (!phoneCheck.ok) {
     notify("error", t.err_phone_title, t.err_phone_text);
     return;
   }
@@ -364,6 +372,13 @@ async function loadClosures() {
     setForm((prev) => ({ ...prev, time: "" }));
     return;
   }
+
+  if (!confirmedPhone) {
+    setPhoneConfirm(phoneCheck);
+    return;
+  }
+
+  setPhoneConfirm(null);
 
   const selectedService = services.find(
     (service) => service.name === form.service
@@ -487,11 +502,18 @@ async function loadClosures() {
     : form.name.trim().length > NAME_MAX_LENGTH
     ? fill(t.alert_name_too_long, { max: NAME_MAX_LENGTH })
     : "";
-  const phoneError = !form.phone.trim()
+  const phoneCheckLive = checkPhone(form.phone);
+  const phoneError = phoneCheckLive.ok
+    ? ""
+    : phoneCheckLive.reason === "empty"
     ? t.field_phone_required
-    : !isValidPhone(form.phone)
-    ? t.field_phone_invalid
-    : "";
+    : phoneCheckLive.reason === "too_short"
+    ? t.field_phone_too_short
+    : phoneCheckLive.reason === "too_long"
+    ? t.field_phone_too_long
+    : phoneCheckLive.reason === "invalid_prefix"
+    ? t.field_phone_prefix
+    : t.field_phone_invalid;
 
   /** Créneaux libres d'un barbier donné. */
   function slotsFor(barberId: number, booked: BookedSlot[] = bookedAppointments) {
@@ -1394,6 +1416,57 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
               onClick={(e) => e.stopPropagation()}
               className="max-h-[94svh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-[#151515] shadow-2xl sm:max-w-2xl sm:rounded-3xl"
             >
+              {/* PHONE CONFIRMATION */}
+              <AnimatePresence>
+                {phoneConfirm?.ok && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-5 backdrop-blur-sm"
+                    onClick={() => setPhoneConfirm(null)}
+                  >
+                    <motion.div
+                      initial={{ scale: 0.96, y: 10 }}
+                      animate={{ scale: 1, y: 0 }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#151515] p-7 text-center shadow-2xl"
+                    >
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white/[0.06]">
+                        <Phone size={24} />
+                      </div>
+
+                      <h3 className="mt-5 text-xl font-black">{t.phone_confirm_title}</h3>
+                      <p className="mt-2 text-sm text-white/45">{t.phone_confirm_text}</p>
+
+                      <p
+                        dir="ltr"
+                        className="mt-5 rounded-2xl border border-white/10 bg-black/40 py-4 text-2xl font-black tracking-wider"
+                      >
+                        {phoneConfirm.display}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => submitBooking(true)}
+                        disabled={submitting}
+                        className="mt-5 w-full rounded-xl bg-white py-4 text-sm font-black text-black transition hover:bg-white/90 disabled:opacity-50"
+                      >
+                        {submitting ? t.submitting : t.phone_confirm_yes}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPhoneConfirm(null)}
+                        className="mt-3 w-full rounded-xl border border-white/10 py-3.5 text-sm font-semibold text-white/60 transition hover:bg-white/10 hover:text-white"
+                      >
+                        {t.phone_confirm_edit}
+                      </button>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* MODAL HEADER */}
               <div className="sticky top-0 z-10 border-b border-white/10 bg-[#151515]/95 px-5 py-5 backdrop-blur-xl sm:px-8 sm:py-6">
                 <div className="flex items-start justify-between">
@@ -1841,8 +1914,6 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                           autoComplete="tel"
                           inputMode="tel"
                           maxLength={20}
-                          pattern="\+?[0-9 .-]{8,20}"
-                          title={t.phone_title}
                           value={form.phone}
                           onChange={(e) =>
                             setForm({
@@ -1859,6 +1930,15 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
                         />
                         {touched.phone && phoneError && (
                           <p className="mt-2 text-xs font-semibold text-red-400">{phoneError}</p>
+                        )}
+                        {phoneCheckLive.ok && (
+                          <p className="mt-2 text-xs text-white/40">
+                            {t.phone_preview}{" "}
+                            <span className="font-semibold text-white/70">{phoneCheckLive.display}</span>
+                            {!phoneCheckLive.mobile && (
+                              <span className="ml-2 text-amber-400/80">{t.phone_landline_hint}</span>
+                            )}
+                          </p>
                         )}
                       </div>
                     </div>

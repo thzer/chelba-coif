@@ -216,6 +216,15 @@ const fr = {
   field_phone_invalid: "Numéro invalide, ex. +216 50 882 529.",
   open_whatsapp: "Ouvrir WhatsApp",
   open_whatsapp_hint: "Le salon confirme votre rendez-vous après réception de votre message WhatsApp.",
+  phone_preview: "Numéro enregistré :",
+  phone_landline_hint: "Numéro fixe : pas de WhatsApp possible.",
+  field_phone_too_short: "Numéro trop court (8 chiffres pour la Tunisie).",
+  field_phone_too_long: "Numéro trop long. Pour un numéro étranger, commencez par l'indicatif (+33…).",
+  field_phone_prefix: "Ce numéro ne ressemble pas à un numéro tunisien. Pour un numéro étranger, commencez par l'indicatif (+33…).",
+  phone_confirm_title: "Vérifiez votre numéro",
+  phone_confirm_text: "Le salon vous contactera sur WhatsApp à ce numéro. Est-il correct ?",
+  phone_confirm_yes: "Oui, c'est mon numéro",
+  phone_confirm_edit: "Modifier",
 };
 
 export type Dictionary = typeof fr;
@@ -401,6 +410,15 @@ const en: Dictionary = {
   field_phone_invalid: "Invalid number, e.g. +216 50 882 529.",
   open_whatsapp: "Open WhatsApp",
   open_whatsapp_hint: "The salon confirms your appointment once it receives your WhatsApp message.",
+  phone_preview: "Number to be saved:",
+  phone_landline_hint: "Landline: WhatsApp not possible.",
+  field_phone_too_short: "Number too short (8 digits for Tunisia).",
+  field_phone_too_long: "Number too long. For a foreign number, start with the country code (+33…).",
+  field_phone_prefix: "This does not look like a Tunisian number. For a foreign number, start with the country code (+33…).",
+  phone_confirm_title: "Check your number",
+  phone_confirm_text: "The salon will contact you on WhatsApp at this number. Is it correct?",
+  phone_confirm_yes: "Yes, that's my number",
+  phone_confirm_edit: "Edit",
 };
 
 const ar: Dictionary = {
@@ -582,6 +600,15 @@ const ar: Dictionary = {
   field_phone_invalid: "رقم غير صحيح، مثال: ‎+216 50 882 529.",
   open_whatsapp: "فتح واتساب",
   open_whatsapp_hint: "يؤكد الصالون موعدك بعد استلام رسالتك عبر واتساب.",
+  phone_preview: "الرقم الذي سيُسجَّل:",
+  phone_landline_hint: "رقم ثابت: لا يمكن استخدام واتساب.",
+  field_phone_too_short: "الرقم قصير جدًا (8 أرقام لتونس).",
+  field_phone_too_long: "الرقم طويل جدًا. للرقم الأجنبي، ابدأ برمز الدولة (+33…).",
+  field_phone_prefix: "لا يبدو هذا رقمًا تونسيًا. للرقم الأجنبي، ابدأ برمز الدولة (+33…).",
+  phone_confirm_title: "تحقق من رقمك",
+  phone_confirm_text: "سيتواصل معك الصالون عبر واتساب على هذا الرقم. هل هو صحيح؟",
+  phone_confirm_yes: "نعم، هذا رقمي",
+  phone_confirm_edit: "تعديل",
 };
 
 export const dictionaries: Record<Lang, Dictionary> = { fr, en, ar };
