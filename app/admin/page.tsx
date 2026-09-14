@@ -3,6 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
+import {
+  CalendarDays,
+  Images,
+  LayoutDashboard,
+  LogOut,
+  RefreshCw,
+  Scissors,
+  Settings,
+  Star,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { safeHttpUrl } from "@/lib/url";
 import {
@@ -106,7 +116,6 @@ export default function AdminPage() {
     }
     return "dashboard";
   });
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   /* =========================
      APPOINTMENTS
@@ -323,39 +332,39 @@ export default function AdminPage() {
   const menu = [
     {
       id: "dashboard" as Section,
-      label: "Dashboard",
+      label: "Tableau de bord",
       shortLabel: "Accueil",
-      icon: "⌂",
+      icon: <LayoutDashboard size={18} />,
     },
     {
       id: "appointments" as Section,
       label: "Rendez-vous",
       shortLabel: "RDV",
-      icon: "◷",
+      icon: <CalendarDays size={18} />,
     },
     {
       id: "services" as Section,
       label: "Services",
       shortLabel: "Services",
-      icon: "✂",
+      icon: <Scissors size={18} />,
     },
     {
       id: "gallery" as Section,
       label: "Galerie",
       shortLabel: "Galerie",
-      icon: "▧",
+      icon: <Images size={18} />,
     },
     {
       id: "reviews" as Section,
       label: "Avis clients",
       shortLabel: "Avis",
-      icon: "★",
+      icon: <Star size={18} />,
     },
     {
       id: "settings" as Section,
       label: "Paramètres",
       shortLabel: "Réglages",
-      icon: "⚙",
+      icon: <Settings size={18} />,
     },
   ];
 
@@ -1237,7 +1246,6 @@ export default function AdminPage() {
     setGalleryImages([]);
     setReviews([]);
     setSection("dashboard");
-    setMobileMenuOpen(false);
   }
 
   async function rejectNonAdmin() {
@@ -1534,7 +1542,7 @@ export default function AdminPage() {
               className="mx-auto h-22 w-22"
             />
 
-            <h1 className="mt-5 text-3xl font-black tracking-tight">
+            <h1 className="mt-5 text-2xl font-black tracking-tight sm:text-3xl">
               Chelba Coif
             </h1>
 
@@ -1700,8 +1708,8 @@ export default function AdminPage() {
             DESKTOP SIDEBAR
         ========================= */}
 
-        <aside className="hidden w-[270px] shrink-0 border-r border-white/[0.08] bg-[#090909] lg:flex lg:flex-col">
-          <div className="border-b border-white/[0.08] p-6">
+        <aside className="sticky top-0 hidden h-screen w-[250px] shrink-0 border-r border-white/[0.08] bg-[#0a0a0a] lg:flex lg:flex-col">
+          <div className="border-b border-white/[0.08] p-5">
             <div className="flex items-center gap-2 sm:gap-3">
               <Image
                 src="/logo.png"
@@ -1724,8 +1732,8 @@ export default function AdminPage() {
           </div>
 
           <div className="flex-1 p-4">
-            <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">
-              Menu principal
+            <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">
+              Menu
             </p>
 
             <nav className="space-y-1">
@@ -1734,21 +1742,14 @@ export default function AdminPage() {
                   key={item.id}
                   onClick={() => {
                     setSection(item.id);
-                    setMobileMenuOpen(false);
                   }}
-                  className={`group flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-left text-sm transition ${
+                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
                     section === item.id
                       ? "bg-white text-black shadow-lg"
-                      : "text-white/50 hover:bg-white/[0.06] hover:text-white"
+                      : "text-white/55 hover:bg-white/[0.06] hover:text-white"
                   }`}
                 >
-                  <span
-                    className={`flex h-8 w-8 items-center justify-center rounded-lg text-base ${
-                      section === item.id
-                        ? "bg-black/10"
-                        : "bg-white/[0.04] group-hover:bg-white/[0.08]"
-                    }`}
-                  >
+                  <span className="flex h-6 w-6 items-center justify-center">
                     {item.icon}
                   </span>
 
@@ -1793,7 +1794,7 @@ export default function AdminPage() {
               onClick={logout}
               className="flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-sm text-white/40 transition hover:bg-red-500/10 hover:text-red-400"
             >
-              <span>↪</span>
+              <LogOut size={16} />
               <span>Déconnexion</span>
             </button>
           </div>
@@ -1808,84 +1809,49 @@ export default function AdminPage() {
           {/* HEADER */}
 
           <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#070707]/90 backdrop-blur-xl">
-            <div className="flex min-h-[64px] items-center justify-between gap-3 px-4 sm:min-h-[76px] sm:px-7 lg:px-10">
-              <div>
-                <p className="hidden text-[10px] font-bold uppercase tracking-[0.2em] text-white/25 sm:block">
-                  Chelba Coif
-                </p>
-
-                <h2 className="text-base font-bold sm:mt-1 sm:text-xl">
-                  {
-                    menu.find(
-                      (item) =>
-                        item.id === section
-                    )?.label
-                  }
-                </h2>
+            <div className="flex min-h-[60px] items-center justify-between gap-3 px-4 sm:min-h-[68px] sm:px-7 lg:px-10">
+              <div className="flex min-w-0 items-center gap-3">
+                <Image src="/logo.png" alt="" width={32} height={32} className="h-8 w-8 shrink-0 lg:hidden" />
+                <div className="min-w-0">
+                  <h2 className="truncate text-base font-bold sm:text-lg">
+                    {menu.find((item) => item.id === section)?.label}
+                  </h2>
+                  <p className="hidden text-[11px] capitalize text-white/35 sm:block">
+                    {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <div className="hidden rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs text-emerald-400 sm:flex sm:items-center sm:gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                   En ligne
                 </div>
 
                 <button
-                  onClick={logout}
-                  className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/50 transition hover:bg-white/10 hover:text-white lg:hidden"
+                  type="button"
+                  onClick={() => loadAll()}
+                  aria-label="Actualiser"
+                  title="Actualiser"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/50 transition hover:bg-white/10 hover:text-white"
                 >
-                  Sortir
+                  <RefreshCw size={16} />
+                </button>
+
+                <button
+                  onClick={logout}
+                  aria-label="Déconnexion"
+                  title="Déconnexion"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/50 transition hover:bg-red-500/10 hover:text-red-400 lg:hidden"
+                >
+                  <LogOut size={16} />
                 </button>
               </div>
             </div>
 
-            {/* MOBILE NAV */}
-
-            <div className="relative border-t border-white/[0.06] px-4 py-2.5 lg:hidden">
-              <button
-                type="button"
-                onClick={() => setMobileMenuOpen((open) => !open)}
-                className="flex min-h-11 w-full items-center justify-between rounded-xl border border-white/10 bg-white/[0.035] px-4 text-sm font-semibold text-white/80 transition active:scale-[0.99]"
-                aria-expanded={mobileMenuOpen}
-              >
-                <span className="flex items-center gap-2.5">
-                  <span className="text-lg">☰</span>
-                  <span>Navigation</span>
-                </span>
-                <span className="text-white/40">{mobileMenuOpen ? "⌃" : "⌄"}</span>
-              </button>
-
-              {mobileMenuOpen && (
-                <div className="absolute left-4 right-4 top-[calc(100%-1px)] z-50 overflow-hidden rounded-xl border border-white/10 bg-[#111]/98 p-1.5 shadow-2xl backdrop-blur-xl">
-                  {menu.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setSection(item.id);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-left text-sm font-medium transition ${
-                        section === item.id
-                          ? "bg-white text-black"
-                          : "text-white/55 active:bg-white/10 active:text-white"
-                      }`}
-                    >
-                      <span className="w-6 text-center">{item.icon}</span>
-                      <span>{item.label}</span>
-                      {item.id === "appointments" && pendingAppointments.length > 0 && (
-                        <span className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${section === item.id ? "bg-black text-white" : "bg-amber-400 text-black"}`}>
-                          {pendingAppointments.length}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           </header>
 
-          <div className="p-4 pb-8 sm:p-7 sm:pb-10 lg:p-10">
+          <div className="p-4 pb-28 sm:p-7 sm:pb-28 lg:p-10 lg:pb-10">
 
             {/* =========================
                 DASHBOARD
@@ -1894,49 +1860,24 @@ export default function AdminPage() {
             {section === "dashboard" && (
               <div className="mx-auto max-w-[1500px]">
 
-                <div className="mb-8">
-                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                    <div>
-                      <p className="text-sm text-white/30">
-                        Vue générale
-                      </p>
-
-                      <h3 className="mt-1 text-2xl font-black tracking-tight sm:text-4xl">
-                        Bonjour 👋
-                      </h3>
-
-                      <p className="mt-1 text-sm capitalize text-white/50">
-                        {new Date().toLocaleDateString("fr-FR", {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </p>
-
-                      <p className="mt-2 max-w-xl text-sm text-white/40">
-                        Gérez facilement les rendez-vous,
-                        services, avis et contenu de votre salon.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={async () => {
-                        await Promise.all([
-                          loadAppointments(),
-                          loadDashboardStats(),
-                        ]);
-                      }}
-                      className="min-h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-white/60 transition hover:bg-white/[0.08] hover:text-white sm:w-fit"
-                    >
-                      ↻ Actualiser
-                    </button>
-                  </div>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-black tracking-tight sm:text-3xl">
+                    Bonjour 👋
+                  </h3>
+                  <p className="mt-1 text-sm text-white/45">
+                    {todayAppointments.length === 0
+                      ? "Aucun rendez-vous aujourd'hui."
+                      : `${todayAppointments.length} rendez-vous aujourd'hui${
+                          pendingAppointments.length > 0
+                            ? ` · ${pendingAppointments.length} à confirmer`
+                            : ""
+                        }.`}
+                  </p>
                 </div>
 
                 {/* STAT CARDS */}
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
 
                   <DashboardCard
                     label="Aujourd'hui"
@@ -1944,7 +1885,7 @@ export default function AdminPage() {
                       todayAppointments.length
                     }
                     description="rendez-vous"
-                    icon="◷"
+                    icon={<CalendarDays size={16} />}
                     onClick={() =>
                       setSection(
                         "appointments"
@@ -1958,7 +1899,7 @@ export default function AdminPage() {
                       pendingAppointments.length
                     }
                     description="à confirmer"
-                    icon="!"
+                    icon={<span className="text-sm font-black">!</span>}
                     accent="amber"
                     onClick={() => {
                       setAppointmentFilter(
@@ -1971,20 +1912,20 @@ export default function AdminPage() {
                   />
 
                   <DashboardCard
-                    label="Services actifs"
+                    label="Services"
                     value={servicesCount}
-                    description="prestations"
-                    icon="✂"
+                    description="prestations actives"
+                    icon={<Scissors size={16} />}
                     onClick={() =>
                       setSection("services")
                     }
                   />
 
                   <DashboardCard
-                    label="Avis publiés"
+                    label="Avis"
                     value={reviewsCount}
-                    description="avis clients"
-                    icon="★"
+                    description="avis publiés"
+                    icon={<Star size={16} />}
                     onClick={() =>
                       setSection("reviews")
                     }
@@ -1994,7 +1935,7 @@ export default function AdminPage() {
 
                 {/* SECONDARY STATS */}
 
-                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <div className="mt-3 grid grid-cols-3 gap-3 sm:mt-4 sm:gap-4">
                   <MiniStat
                     label="Confirmés"
                     value={
@@ -2020,19 +1961,9 @@ export default function AdminPage() {
                   />
                 </div>
 
-                {/* INSIGHTS */}
-
-                <InsightsPanel appointments={appointments} />
-
-                {/* FINANCES */}
-
-                <div className="mt-8">
-                  <FinancePanel appointments={appointments} barbers={barbers} />
-                </div>
-
                 {/* RECENT APPOINTMENTS */}
 
-                <div className="mt-8 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                <div className="mt-8 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]">
                   <div className="flex flex-col gap-4 border-b border-white/[0.07] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                     <div>
                       <h3 className="font-bold">
@@ -2103,6 +2034,16 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                {/* INSIGHTS */}
+
+                <InsightsPanel appointments={appointments} />
+
+                {/* FINANCES */}
+
+                <div className="mt-8">
+                  <FinancePanel appointments={appointments} barbers={barbers} />
+                </div>
+
               </div>
             )}
 
@@ -2113,41 +2054,13 @@ export default function AdminPage() {
             {section === "appointments" && (
               <div className="mx-auto max-w-[1500px]">
 
-                <div className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-                  <div>
-                    <p className="text-sm text-white/30">
-                      Planning
-                    </p>
-
-                    <h3 className="mt-1 text-3xl font-black tracking-tight">
-                      Rendez-vous
-                    </h3>
-
-                    <p className="mt-2 text-sm text-white/40">
-                      Gérez toutes les réservations de vos clients.
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={loadAppointments}
-                    disabled={
-                      appointmentsLoading
-                    }
-                    className="min-h-11 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-white/60 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-50 sm:w-fit"
-                  >
-                    {appointmentsLoading
-                      ? "Actualisation..."
-                      : "↻ Actualiser"}
-                  </button>
-                </div>
-
                 {/* VIEW TOGGLE */}
 
-                <div className="mb-6 inline-flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
+                <div className="mb-5 grid grid-cols-3 rounded-xl border border-white/10 bg-white/[0.03] p-1 sm:inline-flex">
                   {(
                     [
                       ["list", "☰ Liste"],
-                      ["agenda", "▦ Agenda du jour"],
+                      ["agenda", "▦ Agenda"],
                       ["reminders", "🔔 Rappels"],
                     ] as const
                   ).map(([view, label]) => (
@@ -2214,7 +2127,7 @@ export default function AdminPage() {
 
                 {/* APPOINTMENT STATS */}
 
-                <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
                   <FilterStat
                     label="Tous"
                     value={
@@ -2282,10 +2195,10 @@ export default function AdminPage() {
 
                 {/* FILTERS */}
 
-                <div className="mb-6 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
-                  <div className="grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
+                <div className="mb-6 rounded-2xl border border-white/[0.08] bg-[#111111] p-4">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-[1fr_170px_170px_150px_auto]">
 
-                    <div className="relative">
+                    <div className="relative col-span-2 md:col-span-1">
                       <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-white/25">
                         ⌕
                       </span>
@@ -2299,7 +2212,7 @@ export default function AdminPage() {
                             e.target.value
                           )
                         }
-                        placeholder="Rechercher un client, téléphone ou service..."
+                        placeholder="Rechercher (nom, téléphone, service)"
                         className="w-full rounded-xl border border-white/10 bg-black/20 py-3 pl-10 pr-4 text-sm outline-none transition placeholder:text-white/20 focus:border-white/25"
                       />
                     </div>
@@ -2316,7 +2229,7 @@ export default function AdminPage() {
                       className="rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white/70 outline-none"
                     >
                       <option value="all">
-                        Tous les statuts
+                        Statut : tous
                       </option>
                       <option value="pending">
                         En attente
@@ -2337,7 +2250,7 @@ export default function AdminPage() {
                       onChange={(e) => setAppointmentBarberFilter(e.target.value)}
                       className="rounded-xl border border-white/10 bg-[#111] px-4 py-3 text-sm text-white/70 outline-none"
                     >
-                      <option value="all">Tous les coiffeurs</option>
+                      <option value="all">Coiffeur : tous</option>
                       {barbers.map((b) => (
                         <option key={b.id} value={String(b.id)}>
                           {b.name}
@@ -2453,15 +2366,8 @@ export default function AdminPage() {
             {section === "services" && (
               <div className="mx-auto max-w-[1500px]">
 
-                <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <p className="text-sm text-white/30">
-                      Catalogue
-                    </p>
-
-                    <h3 className="mt-1 text-3xl font-black tracking-tight">
-                      Services
-                    </h3>
 
                     <p className="mt-2 text-sm text-white/40">
                       Gérez les prestations, prix et durées de votre salon.
@@ -2717,7 +2623,7 @@ export default function AdminPage() {
                     description="Ajoutez votre première prestation."
                   />
                 ) : (
-                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
                     {services.map(
                       (service) => (
                         <ServiceCard
@@ -2860,23 +2766,12 @@ export default function AdminPage() {
               <div className="mx-auto max-w-[1500px]">
 
                 <div className="mb-8">
-                  <p className="text-sm text-white/30">
-                    Contenu
-                  </p>
-
-                  <h3 className="mt-1 text-3xl font-black tracking-tight">
-                    Galerie
-                  </h3>
-
-                  <p className="mt-2 text-sm text-white/40">
-                    Gérez les photos affichées sur votre site.
-                  </p>
                 </div>
 
                 {/* UPLOAD */}
 
                 <div className="mb-8 grid gap-4 lg:grid-cols-[1fr_auto]">
-                  <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 sm:p-6">
+                  <div className="rounded-2xl border border-white/[0.08] bg-[#111111] p-5 sm:p-6">
                     <div className="flex items-start gap-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-lg text-white/60">
                         ▧
@@ -3075,13 +2970,6 @@ export default function AdminPage() {
 
                 <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <p className="text-sm text-white/30">
-                      Réputation
-                    </p>
-
-                    <h3 className="mt-1 text-3xl font-black tracking-tight">
-                      Avis clients
-                    </h3>
 
                     <p className="mt-2 text-sm text-white/40">
                       Gérez les avis reçus et choisissez lesquels apparaissent sur le site.
@@ -3145,7 +3033,7 @@ export default function AdminPage() {
                           key={
                             review.id
                           }
-                          className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]"
+                          className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]"
                         >
                           {editingReviewId ===
                           review.id ? (
@@ -3386,17 +3274,6 @@ export default function AdminPage() {
               <div className="mx-auto max-w-[1100px]">
 
                 <div className="mb-8">
-                  <p className="text-sm text-white/30">
-                    Configuration
-                  </p>
-
-                  <h3 className="mt-1 text-3xl font-black tracking-tight">
-                    Paramètres
-                  </h3>
-
-                  <p className="mt-2 text-sm text-white/40">
-                    Gérez les informations visibles sur votre site.
-                  </p>
                 </div>
 
                 {settingsLoading ? (
@@ -3406,7 +3283,7 @@ export default function AdminPage() {
 
                     {/* SHOP INFO */}
 
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]">
                       <div className="border-b border-white/[0.07] p-5 sm:p-6">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
@@ -3518,7 +3395,7 @@ export default function AdminPage() {
 
                     {/* BARBERS */}
 
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]">
                       <div className="border-b border-white/[0.07] p-5 sm:p-6">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
@@ -3545,7 +3422,7 @@ export default function AdminPage() {
 
                     {/* SCHEDULE */}
 
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]">
                       <div className="border-b border-white/[0.07] p-5 sm:p-6">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
@@ -3578,7 +3455,7 @@ export default function AdminPage() {
 
                     {/* CLOSURES */}
 
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]">
                       <div className="border-b border-white/[0.07] p-5 sm:p-6">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
@@ -3606,7 +3483,7 @@ export default function AdminPage() {
 
                     {/* NOTIFICATIONS */}
 
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]">
                       <div className="border-b border-white/[0.07] p-5 sm:p-6">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
@@ -3631,7 +3508,7 @@ export default function AdminPage() {
 
                     {/* SECURITY */}
 
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]">
                       <div className="border-b border-white/[0.07] p-5 sm:p-6">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
@@ -3656,7 +3533,7 @@ export default function AdminPage() {
 
                     {/* SOCIAL */}
 
-                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
+                    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111]">
                       <div className="border-b border-white/[0.07] p-5 sm:p-6">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.06]">
@@ -3747,7 +3624,7 @@ export default function AdminPage() {
 
                     {/* SAVE */}
 
-                    <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                    <div className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-[#111111] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                       <div>
                         <p className="font-semibold">
                           Enregistrer les modifications
@@ -3779,6 +3656,46 @@ export default function AdminPage() {
             )}
 
           </div>
+
+          {/* MOBILE TAB BAR */}
+          <nav
+            aria-label="Navigation"
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#0a0a0a]/95 backdrop-blur-xl lg:hidden"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          >
+            <div className="mx-auto grid max-w-2xl grid-cols-6">
+              {menu.map((item) => {
+                const active = section === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSection(item.id);
+                      window.scrollTo({ top: 0 });
+                    }}
+                    className={`relative flex min-h-[60px] flex-col items-center justify-center gap-1 text-[10px] font-semibold transition ${
+                      active ? "text-white" : "text-white/40 active:text-white"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-7 w-11 items-center justify-center rounded-full transition ${
+                        active ? "bg-white text-black" : ""
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+                    <span>{item.shortLabel}</span>
+                    {item.id === "appointments" && pendingAppointments.length > 0 && (
+                      <span className="absolute right-1/2 top-1.5 flex h-4 min-w-4 -translate-x-[-14px] items-center justify-center rounded-full bg-amber-400 px-1 text-[9px] font-black text-black">
+                        {pendingAppointments.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </nav>
         </section>
       </div>
     </main>
@@ -3828,7 +3745,7 @@ function DashboardCard({
   label: string;
   value: number;
   description: string;
-  icon: string;
+  icon: React.ReactNode;
   accent?: "amber";
   onClick?: () => void;
 }) {
@@ -3837,10 +3754,13 @@ function DashboardCard({
       onClick={onClick}
       className="group text-left"
     >
-      <div className="h-full rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 transition duration-300 hover:-translate-y-0.5 hover:border-white/[0.15] hover:bg-white/[0.04]">
-        <div className="flex items-start justify-between">
+      <div className="h-full rounded-2xl border border-white/[0.08] bg-[#111111] p-4 transition duration-300 hover:-translate-y-0.5 hover:border-white/[0.15] sm:p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
+            {label}
+          </p>
           <div
-            className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm ${
+            className={`flex h-8 w-8 items-center justify-center rounded-lg ${
               accent === "amber"
                 ? "bg-amber-400/10 text-amber-400"
                 : "bg-white/[0.06] text-white/60"
@@ -3848,25 +3768,15 @@ function DashboardCard({
           >
             {icon}
           </div>
-
-          <span className="text-xs text-white/15 transition group-hover:text-white/40">
-            →
-          </span>
         </div>
 
-        <p className="mt-5 text-xs font-medium text-white/35">
-          {label}
+        <p className={`mt-3 text-3xl font-black tabular-nums ${accent === "amber" && value > 0 ? "text-amber-400" : ""}`}>
+          {value}
         </p>
 
-        <div className="mt-1 flex items-baseline gap-2">
-          <p className="text-3xl font-black">
-            {value}
-          </p>
-
-          <p className="text-xs text-white/25">
-            {description}
-          </p>
-        </div>
+        <p className="mt-0.5 text-xs text-white/35">
+          {description}
+        </p>
       </div>
     </button>
   );
@@ -3882,20 +3792,14 @@ function MiniStat({
   icon: string;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.02] px-4 py-3">
-      <div>
-        <p className="text-[11px] text-white/30">
-          {label}
-        </p>
+    <div className="rounded-xl border border-white/[0.07] bg-[#0f0f0f] px-3 py-2.5 sm:px-4 sm:py-3">
+      <p className="truncate text-[11px] text-white/35">
+        {label} <span className="text-white/20">{icon}</span>
+      </p>
 
-        <p className="mt-0.5 text-lg font-bold">
-          {value}
-        </p>
-      </div>
-
-      <span className="text-sm text-white/20">
-        {icon}
-      </span>
+      <p className="mt-0.5 text-lg font-bold tabular-nums">
+        {value}
+      </p>
     </div>
   );
 }
@@ -3914,17 +3818,17 @@ function FilterStat({
   return (
     <button
       onClick={onClick}
-      className={`rounded-xl border p-4 text-left transition ${
+      className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-left transition sm:block sm:p-4 ${
         active
-          ? "border-white/20 bg-white/[0.08]"
-          : "border-white/[0.07] bg-white/[0.02] hover:bg-white/[0.05]"
+          ? "border-white/25 bg-white/[0.08]"
+          : "border-white/[0.07] bg-[#0f0f0f] hover:bg-white/[0.05]"
       }`}
     >
-      <p className="text-xs text-white/35">
+      <p className="text-xs text-white/40">
         {label}
       </p>
 
-      <p className="mt-1 text-xl font-black">
+      <p className="text-lg font-black tabular-nums sm:mt-1 sm:text-xl">
         {value}
       </p>
     </button>
@@ -4052,13 +3956,13 @@ function AppointmentCard({
 
   const whatsappLabel =
     appointment.status === "confirmed"
-      ? "📲 Envoyer la confirmation"
+      ? "📲 Confirmation"
       : appointment.status === "cancelled"
-      ? "📲 Prévenir de l'annulation"
-      : "WhatsApp";
+      ? "📲 Annulation"
+      : "📲 WhatsApp";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025] transition hover:border-white/[0.12]">
+    <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111] transition hover:border-white/[0.12]">
       <div className="p-5 sm:p-6">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
 
@@ -4255,110 +4159,74 @@ function ServiceCard({
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-2xl border bg-white/[0.025] transition hover:border-white/[0.15] ${
-        service.active
-          ? "border-white/[0.08]"
-          : "border-red-500/20 opacity-65"
+      className={`flex gap-4 rounded-2xl border bg-[#111111] p-3 transition hover:border-white/[0.15] sm:p-4 ${
+        service.active ? "border-white/[0.08]" : "border-red-500/20 opacity-65"
       }`}
     >
-      {service.image_url ? (
-        <div className="relative h-44 overflow-hidden bg-white/[0.03]">
+      <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-white/[0.04] sm:h-28 sm:w-28">
+        {service.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={service.image_url}
             alt={service.name}
-            className="h-full w-full object-cover transition duration-500 hover:scale-105"
+            loading="lazy"
+            className="h-full w-full object-cover"
           />
-
-          <div className="absolute left-3 top-3">
-            <span
-              className={`rounded-full border px-2.5 py-1 text-[10px] font-bold backdrop-blur-md ${
-                service.active
-                  ? "border-emerald-400/20 bg-black/60 text-emerald-400"
-                  : "border-red-400/20 bg-black/60 text-red-400"
-              }`}
-            >
-              {service.active
-                ? "Actif"
-                : "Masqué"}
-            </span>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-white/15">
+            <Scissors size={26} />
           </div>
-        </div>
-      ) : (
-        <div className="flex h-32 items-center justify-center bg-white/[0.02]">
-          <span className="text-3xl text-white/10">
-            ✂
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h4 className="truncate font-bold">{service.name}</h4>
+            <p className="mt-0.5 text-xs text-white/40">
+              <span className="font-bold text-white">{service.price} DT</span>
+              {service.duration ? ` · ${service.duration} min` : ""}
+              {service.cost ? ` · coût ${service.cost} DT` : ""}
+            </p>
+          </div>
+
+          <span
+            className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+              service.active
+                ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-400"
+                : "border-red-400/20 bg-red-400/10 text-red-400"
+            }`}
+          >
+            {service.active ? "Actif" : "Masqué"}
           </span>
         </div>
-      )}
 
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h4 className="font-bold">
-              {service.name}
-            </h4>
+        {service.description && (
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/35">{service.description}</p>
+        )}
 
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/30">
-              {service.description ||
-                "Aucune description"}
-            </p>
-          </div>
+        <div className="mt-auto flex gap-2 pt-3">
+          <button
+            onClick={onEdit}
+            className="rounded-lg bg-white/[0.06] px-3 py-2 text-[11px] font-semibold text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            Modifier
+          </button>
 
-          {!service.image_url && (
-            <span
-              className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold ${
-                service.active
-                  ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-400"
-                  : "border-red-400/20 bg-red-400/10 text-red-400"
-              }`}
-            >
-              {service.active
-                ? "Actif"
-                : "Masqué"}
-            </span>
-          )}
-        </div>
+          <button
+            onClick={onToggle}
+            className="rounded-lg border border-white/10 px-3 py-2 text-[11px] text-white/50 transition hover:bg-white/10 hover:text-white"
+          >
+            {service.active ? "Masquer" : "Activer"}
+          </button>
 
-        <div className="mt-5 flex items-end justify-between border-t border-white/[0.07] pt-4">
-          <div>
-            <p className="text-xl font-black">
-              {service.price}{" "}
-              <span className="text-xs font-medium text-white/30">
-                DT
-              </span>
-            </p>
-
-            {service.duration && (
-              <p className="mt-0.5 text-[11px] text-white/25">
-                {service.duration} minutes
-              </p>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={onEdit}
-              className="rounded-lg border border-white/10 px-3 py-2 text-[11px] text-white/50 transition hover:bg-white/10 hover:text-white"
-            >
-              Modifier
-            </button>
-
-            <button
-              onClick={onToggle}
-              className="rounded-lg border border-white/10 px-3 py-2 text-[11px] text-white/50 transition hover:bg-white/10 hover:text-white"
-            >
-              {service.active
-                ? "Masquer"
-                : "Activer"}
-            </button>
-
-            <button
-              onClick={onDelete}
-              className="rounded-lg border border-red-500/15 px-3 py-2 text-[11px] text-red-400/70 transition hover:bg-red-500/10 hover:text-red-400"
-            >
-              ×
-            </button>
-          </div>
+          <button
+            onClick={onDelete}
+            aria-label="Supprimer"
+            className="ml-auto rounded-lg border border-red-500/15 px-3 py-2 text-[11px] text-red-400/70 transition hover:bg-red-500/10 hover:text-red-400"
+          >
+            ×
+          </button>
         </div>
       </div>
     </div>
@@ -4527,7 +4395,7 @@ function LoadingBox({
   text: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-12 text-center">
+    <div className="rounded-2xl border border-white/[0.08] bg-[#111111] p-12 text-center">
       <div className="mx-auto flex w-fit items-center gap-1.5">
         <span className="h-2 w-2 animate-pulse rounded-full bg-white/70" />
         <span className="h-2 w-2 animate-pulse rounded-full bg-white/40 [animation-delay:150ms]" />
