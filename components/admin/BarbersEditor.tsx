@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Barber } from "@/lib/schedule";
-import { removeImageByUrl, uploadImage, validateImageFile } from "@/lib/images";
+import { removeImageByUrl, uploadImage } from "@/lib/images";
+import { ImageCropper } from "@/components/admin/ImageCropper";
+import { CROP, type CropRequest, pickImage } from "@/lib/crop";
 
 const inputClass =
   "w-full rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-white/25 focus:bg-black/30";
@@ -23,6 +25,7 @@ type Props = {
 export function BarbersEditor({ barbers, onChange }: Props) {
   const [newName, setNewName] = useState("");
   const [busyId, setBusyId] = useState<number | "new" | null>(null);
+  const [cropRequest, setCropRequest] = useState<CropRequest | null>(null);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -95,17 +98,7 @@ export function BarbersEditor({ barbers, onChange }: Props) {
     await onChange();
   }
 
-  async function changePhoto(barber: Barber, e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    const problem = validateImageFile(file);
-    if (problem) {
-      alert(problem);
-      return;
-    }
-
+  async function changePhoto(barber: Barber, file: File) {
     setBusyId(barber.id);
 
     try {
@@ -144,6 +137,21 @@ export function BarbersEditor({ barbers, onChange }: Props) {
 
   return (
     <div className="space-y-5">
+      {cropRequest && (
+        <ImageCropper
+          file={cropRequest.file}
+          aspect={cropRequest.aspect}
+          title={cropRequest.title}
+          hint={cropRequest.hint}
+          onCancel={() => setCropRequest(null)}
+          onDone={(file) => {
+            const done = cropRequest.onDone;
+            setCropRequest(null);
+            done(file);
+          }}
+        />
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         {barbers.map((barber) => (
           <BarberCard
@@ -153,7 +161,12 @@ export function BarbersEditor({ barbers, onChange }: Props) {
             onSaveText={(name, bio, commission_pct) =>
               update(barber, { name, bio, commission_pct }, "Impossible d'enregistrer ce coiffeur.")
             }
-            onPhoto={(e) => changePhoto(barber, e)}
+            onPhoto={(e) =>
+              pickImage(e, setCropRequest, {
+                ...CROP.barber,
+                onDone: (file) => changePhoto(barber, file),
+              })
+            }
             onRemovePhoto={() => removePhoto(barber)}
             onToggle={() => toggle(barber)}
             onRemove={() => remove(barber)}

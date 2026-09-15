@@ -4,14 +4,21 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import Image from "next/image";
 import {
+  AlarmClock,
   CalendarDays,
+  Check,
+  CheckCheck,
   Images,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
+  Phone,
   RefreshCw,
   Scissors,
   Settings,
   Star,
+  Trash2,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { safeHttpUrl } from "@/lib/url";
@@ -31,6 +38,8 @@ import { SecurityPanel } from "@/components/admin/SecurityPanel";
 import { BarbersEditor } from "@/components/admin/BarbersEditor";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { RemindersPanel } from "@/components/admin/RemindersPanel";
+import { ImageCropper } from "@/components/admin/ImageCropper";
+import { CROP, type CropRequest, pickImage } from "@/lib/crop";
 import { FinancePanel } from "@/components/admin/FinancePanel";
 import { ToastViewport, useToasts } from "@/components/Toast";
 import {
@@ -40,6 +49,7 @@ import {
   validateImageFile,
 } from "@/lib/images";
 import { SITE_URL } from "@/lib/site";
+import { formatPhone } from "@/lib/phone";
 import { type ClientMessageKind, clientMessages, whatsappUrl } from "@/lib/whatsapp";
 
 type Section =
@@ -108,6 +118,9 @@ type Review = {
 export default function AdminPage() {
   const [user, setUser] = useState<User | null>(null);
   const { toasts, notify, dismiss } = useToasts(8000);
+
+  // Recadrage : une photo choisie passe par l'éditeur avant d'être envoyée.
+  const [cropRequest, setCropRequest] = useState<CropRequest | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [section, setSection] = useState<Section>(() => {
@@ -505,21 +518,7 @@ export default function AdminPage() {
     resetServiceForm();
   }
 
-  async function uploadServiceImage(
-    e: React.ChangeEvent<HTMLInputElement>
-  ) {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    const validationError = validateImageFile(file);
-
-    if (validationError) {
-      alert(validationError);
-      e.target.value = "";
-      return;
-    }
-
+  async function uploadServiceImage(file: File) {
     setUploadingServiceImage(true);
 
     try {
@@ -553,7 +552,6 @@ export default function AdminPage() {
       setPendingServiceImagePath(filePath);
     } finally {
       setUploadingServiceImage(false);
-      e.target.value = "";
     }
   }
 
@@ -840,21 +838,7 @@ export default function AdminPage() {
     setGalleryLoading(false);
   }
 
-  async function uploadGalleryImage(
-    e: React.ChangeEvent<HTMLInputElement>
-  ) {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    const validationError = validateImageFile(file);
-
-    if (validationError) {
-      alert(validationError);
-      e.target.value = "";
-      return;
-    }
-
+  async function uploadGalleryImage(file: File) {
     setUploadingImage(true);
 
     try {
@@ -910,7 +894,6 @@ export default function AdminPage() {
       await loadGallery();
     } finally {
       setUploadingImage(false);
-      e.target.value = "";
     }
   }
 
@@ -976,22 +959,7 @@ export default function AdminPage() {
     await loadGallery();
   }
 
-  async function replaceGalleryImage(
-    e: React.ChangeEvent<HTMLInputElement>,
-    image: GalleryImage
-  ) {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    const validationError = validateImageFile(file);
-
-    if (validationError) {
-      alert(validationError);
-      e.target.value = "";
-      return;
-    }
-
+  async function replaceGalleryImage(file: File, image: GalleryImage) {
     setReplacingGalleryId(image.id);
 
     try {
@@ -1063,7 +1031,6 @@ export default function AdminPage() {
       await loadGallery();
     } finally {
       setReplacingGalleryId(null);
-      e.target.value = "";
     }
   }
 
@@ -1698,6 +1665,22 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen bg-[#070707] text-white">
       <ToastViewport toasts={toasts} onDismiss={dismiss} />
+
+      {cropRequest && (
+        <ImageCropper
+          file={cropRequest.file}
+          aspect={cropRequest.aspect}
+          title={cropRequest.title}
+          hint={cropRequest.hint}
+          onCancel={() => setCropRequest(null)}
+          onDone={(file) => {
+            const done = cropRequest.onDone;
+            setCropRequest(null);
+            done(file);
+          }}
+        />
+      )}
+
       <div className="flex min-h-screen overflow-x-hidden">
 
         {/* =========================
@@ -2540,7 +2523,12 @@ export default function AdminPage() {
                                       accept="image/jpeg,image/png,image/webp"
                                       className="hidden"
                                       disabled={uploadingServiceImage}
-                                      onChange={uploadServiceImage}
+                                      onChange={(e) =>
+                                        pickImage(e, setCropRequest, {
+                                          ...CROP.service,
+                                          onDone: uploadServiceImage,
+                                        })
+                                      }
                                     />
                                   </label>
 
@@ -2811,8 +2799,11 @@ export default function AdminPage() {
                       disabled={
                         uploadingImage
                       }
-                      onChange={
-                        uploadGalleryImage
+                      onChange={(e) =>
+                        pickImage(e, setCropRequest, {
+                          ...CROP.gallery,
+                          onDone: uploadGalleryImage,
+                        })
                       }
                     />
                   </label>
@@ -2938,10 +2929,10 @@ export default function AdminPage() {
                             image.id
                           }
                           onReplace={(e) =>
-                            replaceGalleryImage(
-                              e,
-                              image
-                            )
+                            pickImage(e, setCropRequest, {
+                              ...CROP.gallery,
+                              onDone: (file) => replaceGalleryImage(file, image),
+                            })
                           }
                           onDelete={() =>
                             deleteGalleryImage(
@@ -3949,10 +3940,17 @@ function AppointmentCard({
 
   const whatsappLabel =
     appointment.status === "confirmed"
-      ? "📲 Confirmation"
+      ? "Envoyer la confirmation au client"
       : appointment.status === "cancelled"
-      ? "📲 Annulation"
-      : "📲 WhatsApp";
+      ? "Prévenir le client de l'annulation"
+      : "Écrire au client sur WhatsApp";
+
+  const whatsappShortLabel =
+    appointment.status === "confirmed"
+      ? "Confirmation"
+      : appointment.status === "cancelled"
+      ? "Annulation"
+      : "WhatsApp";
 
   return (
     <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-[#111111] transition hover:border-white/[0.12]">
@@ -3987,21 +3985,23 @@ function AppointmentCard({
 
               <a
                 href={`tel:${appointment.phone}`}
-                className="mt-1 block w-fit text-xs text-white/30 transition hover:text-white"
+                dir="ltr"
+                className="mt-1 inline-flex w-fit items-center gap-1.5 text-xs text-white/40 transition hover:text-white"
               >
-                {appointment.phone}
+                <Phone size={12} />
+                {formatPhone(appointment.phone)}
               </a>
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <InfoPill
-                  icon="▣"
+                  icon={<CalendarDays size={13} />}
                   text={formatDateStaticLong(
                     appointment.appointment_date
                   )}
                 />
 
                 <InfoPill
-                  icon="◷"
+                  icon={<AlarmClock size={13} />}
                   text={appointment.appointment_time.slice(
                     0,
                     5
@@ -4017,21 +4017,21 @@ function AppointmentCard({
 
                 {service && (
                   <InfoPill
-                    icon="✂"
+                    icon={<Scissors size={13} />}
                     text={service.name}
                   />
                 )}
 
                 {service && (
                   <InfoPill
-                    icon="DT"
+                    icon={null}
                     text={`${service.price} DT`}
                   />
                 )}
 
                 {service?.duration && (
                   <InfoPill
-                    icon="⌛"
+                    icon={null}
                     text={`${service.duration} min`}
                   />
                 )}
@@ -4039,79 +4039,84 @@ function AppointmentCard({
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2 xl:max-w-[500px] xl:justify-end">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap xl:max-w-[560px] xl:justify-end">
 
-            {appointment.status ===
-              "pending" && (
+            {appointment.status === "pending" && (
               <button
                 onClick={onConfirm}
-                className="min-h-11 flex-1 rounded-lg bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-400 transition hover:bg-emerald-400/20 sm:flex-none"
+                className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-black transition hover:bg-emerald-400 active:scale-[0.98] sm:col-span-1"
               >
-                ✓ Confirmer
+                <Check size={16} strokeWidth={3} />
+                Confirmer
               </button>
             )}
 
-            {appointment.status ===
-              "confirmed" && (
+            {appointment.status === "confirmed" && (
               <button
                 onClick={onComplete}
-                className="min-h-11 flex-1 rounded-lg bg-blue-400/10 px-3 py-2 text-xs font-semibold text-blue-400 transition hover:bg-blue-400/20 sm:flex-none"
+                className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-black transition hover:bg-white/90 active:scale-[0.98] sm:col-span-1"
               >
-                ✓ Terminer
+                <CheckCheck size={16} strokeWidth={3} />
+                Terminer
               </button>
             )}
-
-            {appointment.status !==
-              "cancelled" &&
-              appointment.status !==
-                "completed" && (
-                <button
-                  onClick={onCancel}
-                  className="min-h-11 flex-1 rounded-lg bg-red-400/10 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-400/20 sm:flex-none"
-                >
-                  × Annuler
-                </button>
-              )}
 
             {whatsappHref && (
               <a
                 href={whatsappHref}
                 target="_blank"
                 rel="noreferrer"
-                className={`min-h-11 flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition sm:flex-none ${
+                title={whatsappLabel}
+                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition active:scale-[0.98] ${
                   appointment.status === "confirmed"
-                    ? "bg-emerald-400/15 text-emerald-300 hover:bg-emerald-400/25"
-                    : "bg-white/[0.06] text-white/60 hover:bg-white/10 hover:text-white"
+                    ? "bg-[#25D366]/15 text-[#4ade80] hover:bg-[#25D366]/25"
+                    : "border border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                {whatsappLabel}
+                <MessageCircle size={16} />
+                {whatsappShortLabel}
               </a>
             )}
+
+            <a
+              href={`tel:${appointment.phone}`}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 text-sm font-semibold text-white/70 transition hover:bg-white/10 hover:text-white active:scale-[0.98]"
+            >
+              <Phone size={16} />
+              Appeler
+            </a>
 
             {reminderHref && (
               <a
                 href={reminderHref}
                 target="_blank"
                 rel="noreferrer"
-                title="Envoyer un rappel le jour du rendez-vous"
-                className="min-h-11 flex-1 rounded-lg bg-white/[0.06] px-3 py-2 text-xs font-semibold text-white/60 transition hover:bg-white/10 hover:text-white sm:flex-none"
+                title="Envoyer un rappel au client"
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 text-sm font-semibold text-white/70 transition hover:bg-white/10 hover:text-white active:scale-[0.98]"
               >
-                ⏰ Rappel
+                <AlarmClock size={16} />
+                Rappel
               </a>
             )}
 
-            <a
-              href={`tel:${appointment.phone}`}
-              className="min-h-11 flex-1 rounded-lg bg-white/[0.06] px-3 py-2 text-xs font-semibold text-white/60 transition hover:bg-white/10 hover:text-white sm:flex-none"
-            >
-              Appeler
-            </a>
+            {appointment.status !== "cancelled" && appointment.status !== "completed" && (
+              <button
+                onClick={onCancel}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-400/25 px-4 text-sm font-semibold text-red-400 transition hover:bg-red-400/10 active:scale-[0.98]"
+              >
+                <X size={16} strokeWidth={3} />
+                Annuler
+              </button>
+            )}
 
             <button
               onClick={onDelete}
-              className="min-h-11 flex-1 rounded-lg border border-red-500/10 px-3 py-2 text-xs text-red-400/60 transition hover:bg-red-500/10 hover:text-red-400 sm:flex-none"
+              aria-label="Supprimer définitivement"
+              title="Supprimer définitivement"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm text-white/30 transition hover:bg-red-500/10 hover:text-red-400 active:scale-[0.98] sm:w-11 sm:px-0"
             >
-              Supprimer
+              <Trash2 size={16} />
+              <span className="sm:hidden">Supprimer</span>
             </button>
           </div>
 
@@ -4125,15 +4130,12 @@ function InfoPill({
   icon,
   text,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   text: string;
 }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 text-xs text-white/45">
-      <span className="text-white/25">
-        {icon}
-      </span>
-
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/[0.05] px-2.5 py-1.5 text-xs text-white/60">
+      <span className="text-white/30">{icon}</span>
       {text}
     </span>
   );
