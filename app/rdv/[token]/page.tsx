@@ -10,6 +10,7 @@ import { type Lang, DEFAULT_LANG, LANGS, dictionaries, isLang, langMeta } from "
 import { formatPhone } from "@/lib/phone";
 import { ToastViewport, useToasts } from "@/components/Toast";
 import { ReminderOptIn } from "@/components/ReminderOptIn";
+import { removeBooking, saveBooking } from "@/lib/myBookings";
 
 type AppointmentView = {
   id: number;
@@ -90,6 +91,19 @@ export default function AppointmentPage() {
       if (cancelled) return;
       setAppointment(result);
       setState(result ? "ok" : "not_found");
+
+      // Mémorise le RDV sur cet appareil (bouton « Mes rendez-vous » du site).
+      if (result && (result.status === "pending" || result.status === "confirmed")) {
+        saveBooking({
+          token,
+          date: result.appointment_date,
+          time: result.appointment_time,
+          service: result.service ?? "",
+          barber: result.barber ?? "",
+        });
+      } else if (result) {
+        removeBooking(token);
+      }
     });
     return () => {
       cancelled = true;
@@ -110,6 +124,7 @@ export default function AppointmentPage() {
     }
 
     if (data === "cancelled") {
+      removeBooking(token);
       notify("success", t.rdv_cancelled_title, t.rdv_cancelled_text);
       await load();
     } else if (data === "too_late") {

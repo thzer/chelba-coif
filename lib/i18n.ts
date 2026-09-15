@@ -256,6 +256,9 @@ const fr = {
   rdv_not_cancellable_text: "Ce rendez-vous est déjà terminé ou annulé.",
   rdv_contact_salon: "Contacter le salon sur WhatsApp",
   rdv_keep_link: "Ce lien est personnel : ne le partagez pas.",
+  my_bookings: "Mes rendez-vous",
+  my_bookings_manage: "Gérer",
+  my_bookings_hint: "Les rendez-vous pris depuis cet appareil. Pour annuler, ouvrez le rendez-vous.",
 
   // Rappel la veille
   reminder_offer_title: "Recevoir un rappel la veille",
@@ -492,6 +495,9 @@ const en: Dictionary = {
   rdv_not_cancellable_text: "This appointment is already completed or cancelled.",
   rdv_contact_salon: "Contact the salon on WhatsApp",
   rdv_keep_link: "This link is personal: do not share it.",
+  my_bookings: "My appointments",
+  my_bookings_manage: "Manage",
+  my_bookings_hint: "Appointments booked from this device. To cancel, open the appointment.",
 
   reminder_offer_title: "Get a reminder the day before",
   reminder_offer_text: "A notification on this device 24 h before your appointment.",
@@ -723,6 +729,9 @@ const ar: Dictionary = {
   rdv_not_cancellable_text: "هذا الموعد منتهٍ أو ملغى بالفعل.",
   rdv_contact_salon: "التواصل مع الصالون عبر واتساب",
   rdv_keep_link: "هذا الرابط شخصي: لا تشاركه.",
+  my_bookings: "مواعيدي",
+  my_bookings_manage: "إدارة",
+  my_bookings_hint: "المواعيد المحجوزة من هذا الجهاز. للإلغاء، افتح الموعد.",
 
   reminder_offer_title: "تلقّي تذكير قبل يوم",
   reminder_offer_text: "إشعار على هذا الجهاز قبل 24 ساعة من موعدك.",

@@ -18,6 +18,7 @@ import { ToastViewport, useToasts } from "@/components/Toast";
 import { type PhoneCheck, checkPhone } from "@/lib/phone";
 import { ReminderOptIn } from "@/components/ReminderOptIn";
 import { SITE_URL } from "@/lib/site";
+import { type StoredBooking, saveBooking, upcomingBookings } from "@/lib/myBookings";
 import {
   type Barber,
   type BookedSlot,
@@ -97,6 +98,9 @@ export default function Home() {
   const [linkCopied, setLinkCopied] = useState(false);
 
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [myBookings, setMyBookings] = useState<StoredBooking[]>([]);
+  const [myBookingsOpen, setMyBookingsOpen] = useState(false);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [reviews, setReviews] = useState<
   {
@@ -253,6 +257,11 @@ async function loadClosures() {
   loadClosures();
 }, []);
   const [confirmed, setConfirmed] = useState(false);
+  // Réservations faites depuis cet appareil (pour « Mes rendez-vous »).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMyBookings(upcomingBookings(toDateString(new Date())));
+  }, [confirmed, myBookingsOpen]);
   const [submitting, setSubmitting] = useState(false);
   const [assignedBarber, setAssignedBarber] = useState("");
 
@@ -466,7 +475,9 @@ async function submitBooking(confirmedPhone: boolean) {
 🕐 Heure : ${form.time}
 
 👤 Client : ${customerName}
-📱 Téléphone : ${customerPhone}`;
+📱 Téléphone : ${customerPhone}
+
+🔗 Gérer / annuler : ${SITE_URL}/rdv/${cancelToken}`;
 
   const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(
   /\D/g,
@@ -475,6 +486,13 @@ async function submitBooking(confirmedPhone: boolean) {
 
   setLastWhatsappUrl(whatsappUrl);
   setLastToken(cancelToken);
+  saveBooking({
+    token: cancelToken,
+    date: form.date,
+    time: form.time,
+    service: form.service,
+    barber: barber.name,
+  });
   setLinkCopied(false);
   setAssignedBarber(barber.name);
   setConfirmed(true);
@@ -638,6 +656,20 @@ async function submitBooking(confirmedPhone: boolean) {
           </div>
 
           <div className="flex items-center gap-2">
+            {myBookings.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setMyBookingsOpen(true)}
+                className="hidden items-center gap-2 rounded-full border border-white/15 px-3.5 py-2 text-[11px] font-bold text-white/80 transition hover:bg-white/10 hover:text-white md:flex"
+              >
+                <CalendarDays size={14} />
+                {t.my_bookings}
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-black text-black">
+                  {myBookings.length}
+                </span>
+              </button>
+            )}
+
             <div className="hidden md:flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 text-[11px] font-bold">
               {LANGS.map((l) => (
                 <button
@@ -679,6 +711,23 @@ async function submitBooking(confirmedPhone: boolean) {
               exit={{ opacity: 0, y: -8 }}
               className="mx-3 mt-2 rounded-2xl border border-white/10 bg-[#111111]/95 p-2 shadow-2xl backdrop-blur-2xl sm:mx-5 md:hidden"
             >
+              {myBookings.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setMyBookingsOpen(true);
+                  }}
+                  className="mb-2 flex min-h-12 w-full items-center gap-3 rounded-xl bg-white px-4 text-sm font-bold text-black"
+                >
+                  <CalendarDays size={16} />
+                  {t.my_bookings}
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-black px-1.5 text-[10px] font-black text-white">
+                    {myBookings.length}
+                  </span>
+                </button>
+              )}
+
               <div className="mb-2 flex justify-center">
               <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 text-[11px] font-bold">
               {LANGS.map((l) => (
@@ -1408,6 +1457,65 @@ className="group inline-flex items-center justify-center gap-3 rounded-full bg-w
           <MessageCircle size={25} />
         </a>
       </div>
+      {/* MY BOOKINGS */}
+      <AnimatePresence>
+        {myBookingsOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-black/80 p-0 backdrop-blur-md sm:items-center sm:p-4"
+            onClick={() => setMyBookingsOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 30 }}
+              animate={{ y: 0 }}
+              exit={{ y: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full rounded-t-3xl border border-white/10 bg-[#151515] shadow-2xl sm:max-w-md sm:rounded-3xl"
+            >
+              <div className="flex items-start justify-between border-b border-white/10 px-6 py-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/30">Chelba Coif</p>
+                  <h2 className="mt-1 text-2xl font-black uppercase">{t.my_bookings}</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMyBookingsOpen(false)}
+                  aria-label={t.close}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white/60 transition hover:bg-white/10 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <ul className="divide-y divide-white/[0.06]">
+                {myBookings.map((b) => (
+                  <li key={b.token} className="flex items-center justify-between gap-4 px-6 py-4">
+                    <div className="min-w-0">
+                      <p className="font-bold capitalize">
+                        {formatLongDate(b.date)} · {b.time}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-white/45">
+                        {b.service} · {b.barber}
+                      </p>
+                    </div>
+                    <a
+                      href={`/rdv/${b.token}`}
+                      className="shrink-0 rounded-xl border border-white/15 px-4 py-2.5 text-xs font-bold transition hover:bg-white hover:text-black"
+                    >
+                      {t.my_bookings_manage}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="px-6 py-4 text-xs leading-5 text-white/30">{t.my_bookings_hint}</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* BOOKING MODAL */}
       <AnimatePresence>
         {bookingOpen && (
