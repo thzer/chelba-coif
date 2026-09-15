@@ -475,9 +475,7 @@ async function submitBooking(confirmedPhone: boolean) {
 🕐 Heure : ${form.time}
 
 👤 Client : ${customerName}
-📱 Téléphone : ${customerPhone}
-
-🔗 Gérer / annuler : ${SITE_URL}/rdv/${cancelToken}`;
+📱 Téléphone : ${customerPhone}`;
 
   const whatsappUrl = `https://wa.me/${settings.whatsapp.replace(
   /\D/g,
@@ -498,12 +496,10 @@ async function submitBooking(confirmedPhone: boolean) {
   setConfirmed(true);
   setTouched({ name: false, phone: false });
 
-  const opened = window.open(whatsappUrl, "_blank");
-  notify(
-    "success",
-    t.ok_booking_title,
-    opened ? t.ok_booking_text : t.ok_booking_text_blocked
-  );
+  // Pas d'ouverture automatique : elle laissait un onglet vide (about:blank)
+  // au retour de WhatsApp. Le client clique le bouton vert de l'écran de
+  // confirmation, qui ouvre WhatsApp proprement.
+  notify("success", t.ok_booking_title, t.ok_booking_text);
 }
 
   const selectedService = services.find(

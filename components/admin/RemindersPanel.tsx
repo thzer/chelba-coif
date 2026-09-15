@@ -21,7 +21,6 @@ type Appointment = {
 
 type Props = {
   appointments: Appointment[];
-  siteUrl: string;
   shopName: string;
 };
 
@@ -35,7 +34,7 @@ function addDays(date: string, days: number) {
  * Rendez-vous d'aujourd'hui et de demain : qui a un rappel automatique
  * (push) et à qui envoyer un rappel WhatsApp en un clic.
  */
-export function RemindersPanel({ appointments, siteUrl, shopName }: Props) {
+export function RemindersPanel({ appointments, shopName }: Props) {
   const today = toDateString(new Date());
   const tomorrow = addDays(today, 1);
 
@@ -140,7 +139,6 @@ export function RemindersPanel({ appointments, siteUrl, shopName }: Props) {
                       service: service?.name,
                       barber: a.barbers?.[0]?.name,
                       shopName,
-                      manageUrl: a.cancel_token ? `${siteUrl}/rdv/${a.cancel_token}` : null,
                     })
                   );
 

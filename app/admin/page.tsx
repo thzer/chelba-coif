@@ -685,27 +685,23 @@ export default function AdminPage() {
       )
     );
 
-    // Prévenir le client sur WhatsApp (le bouton reste disponible sur la
-    // carte si le navigateur bloque l'ouverture automatique).
-    if (status === "confirmed" || status === "cancelled") {
-      const appointment = appointments.find((a) => a.id === id);
+    // Pas d'ouverture automatique de WhatsApp : elle laissait un onglet vide
+    // (about:blank) au retour. Le bouton WhatsApp de la carte, avec le message
+    // déjà rédigé, reste le chemin pour prévenir le client.
+    if (status === "confirmed") {
+      notify(
+        "success",
+        "Rendez-vous confirmé",
+        "Envoyez la confirmation au client avec le bouton WhatsApp de la carte."
+      );
+    }
 
-      if (appointment) {
-        const url = whatsappUrl(
-          appointment.phone,
-          clientMessages[status]({
-            customer_name: appointment.customer_name,
-            appointment_date: appointment.appointment_date,
-            appointment_time: appointment.appointment_time,
-            service: appointment.services?.[0]?.name,
-            barber: appointment.barbers?.[0]?.name,
-            shopName: settings.shop_name,
-            manageUrl: appointment.cancel_token ? `${SITE_URL}/rdv/${appointment.cancel_token}` : null,
-          })
-        );
-
-        if (url) window.open(url, "_blank", "noopener");
-      }
+    if (status === "cancelled") {
+      notify(
+        "info",
+        "Rendez-vous annulé",
+        "Prévenez le client avec le bouton WhatsApp de la carte."
+      );
     }
   }
 
@@ -2118,7 +2114,6 @@ export default function AdminPage() {
                 {appointmentView === "reminders" && (
                   <RemindersPanel
                     appointments={appointments}
-                    siteUrl={SITE_URL}
                     shopName={settings.shop_name}
                   />
                 )}
@@ -3934,7 +3929,6 @@ function AppointmentCard({
           appointment_time: appointment.appointment_time,
           service: service?.name,
           barber: appointment.barbers?.[0]?.name,
-          manageUrl: appointment.cancel_token ? `${SITE_URL}/rdv/${appointment.cancel_token}` : null,
         })
       : undefined
   );
@@ -3949,7 +3943,6 @@ function AppointmentCard({
             appointment_time: appointment.appointment_time,
             service: service?.name,
             barber: appointment.barbers?.[0]?.name,
-            manageUrl: appointment.cancel_token ? `${SITE_URL}/rdv/${appointment.cancel_token}` : null,
           })
         )
       : null;

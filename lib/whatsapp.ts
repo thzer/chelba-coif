@@ -13,8 +13,6 @@ type AppointmentInfo = {
   service?: string | null;
   barber?: string | null;
   shopName?: string;
-  /** Lien « Gérer / annuler mon rendez-vous » (page /rdv/<jeton>). */
-  manageUrl?: string | null;
 };
 
 function formatDate(date: string) {
@@ -37,18 +35,14 @@ export const clientMessages = {
     } est confirmé ✅\n\n📅 ${formatDate(a.appointment_date)}\n🕐 ${a.appointment_time.slice(
       0,
       5
-    )}${a.service ? `\n✂️ ${a.service}` : ""}${a.barber ? `\n💈 ${a.barber}` : ""}${
-      a.manageUrl ? `\n\nUn empêchement ? Annulez en un clic :\n${a.manageUrl}` : ""
-    }\n\nÀ bientôt !`,
+    )}${a.service ? `\n✂️ ${a.service}` : ""}${a.barber ? `\n💈 ${a.barber}` : ""}\n\nÀ bientôt !`,
 
   reminder: (a: AppointmentInfo) =>
     `Bonjour ${firstName(a.customer_name)} 👋\n\nPetit rappel : votre rendez-vous chez ${
       a.shopName ?? "Chelba Coif"
     } est ${formatDate(a.appointment_date)} à ${a.appointment_time.slice(0, 5)}${
       a.service ? ` (${a.service})` : ""
-    }${a.barber ? ` avec ${a.barber}` : ""}.${
-      a.manageUrl ? `\n\nUn empêchement ? ${a.manageUrl}` : ""
-    }\n\nÀ tout à l'heure !`,
+    }${a.barber ? ` avec ${a.barber}` : ""}.\n\nÀ tout à l'heure !`,
 
   cancelled: (a: AppointmentInfo) =>
     `Bonjour ${firstName(a.customer_name)},\n\nNous sommes désolés, votre rendez-vous du ${formatDate(
