@@ -37,6 +37,7 @@ export type Barber = {
   photo_url: string | null;
   bio: string | null;
   commission_pct?: number | null;
+  is_owner?: boolean;
 };
 
 /** Créneaux d'un barbier précis (les RDV sans barbier bloquent tout le monde). */

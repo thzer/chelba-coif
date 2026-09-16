@@ -119,8 +119,9 @@ export function FinancePanel({ appointments, barbers }: { appointments: Appointm
     const inPeriod = appointments.filter((a) => a.appointment_date >= from && a.appointment_date <= to);
     const completed = inPeriod.filter((a) => a.status === "completed");
     const commissionOf = (a: Appointment) => {
-      const pct = barbers.find((b) => b.id === a.barber_id)?.commission_pct ?? 0;
-      return (Number(a.services?.[0]?.price ?? 0) * pct) / 100;
+      const b = barbers.find((x) => x.id === a.barber_id);
+      if (!b || b.is_owner) return 0;
+      return (Number(a.services?.[0]?.price ?? 0) * (b.commission_pct ?? 0)) / 100;
     };
 
     const revenue = completed.reduce((s, a) => s + Number(a.services?.[0]?.price ?? 0), 0);
@@ -158,7 +159,7 @@ export function FinancePanel({ appointments, barbers }: { appointments: Appointm
       const mine = completed.filter((a) => a.barber_id === b.id);
       const rev = mine.reduce((s, a) => s + Number(a.services?.[0]?.price ?? 0), 0);
       const cost = mine.reduce((s, a) => s + Number(a.services?.[0]?.cost ?? 0), 0);
-      const com = (rev * (b.commission_pct ?? 0)) / 100;
+      const com = b.is_owner ? 0 : (rev * (b.commission_pct ?? 0)) / 100;
       return { barber: b, count: mine.length, revenue: rev, commission: com, margin: rev - cost - com };
     });
 
@@ -274,10 +275,10 @@ export function FinancePanel({ appointments, barbers }: { appointments: Appointm
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpi("Chiffre d'affaires", `${fmt(stats.revenue)} DT`, `${stats.completedCount} RDV terminés · panier ${fmt(stats.avgTicket)} DT`)}
-        {kpi("Coûts & commissions", `${fmt(stats.productCost + stats.commissions)} DT`, `produits ${fmt(stats.productCost)} · commissions ${fmt(stats.commissions)}`)}
+        {kpi("Parts coiffeurs & produits", `${fmt(stats.productCost + stats.commissions)} DT`, `parts coiffeurs ${fmt(stats.commissions)} · produits ${fmt(stats.productCost)}`)}
         {kpi("Dépenses", `${fmt(stats.expensesTotal)} DT`, `${stats.periodExpenses.length} dépense${stats.periodExpenses.length > 1 ? "s" : ""} sur la période`)}
         {kpi(
-          "Marge nette",
+          "Bénéfice du salon",
           `${fmt(stats.net)} DT`,
           stats.revenue > 0 ? `${stats.marginPct.toFixed(0)} % du chiffre d'affaires` : "aucun RDV terminé",
           stats.net > 0 ? "good" : stats.net < 0 ? "bad" : undefined
@@ -377,7 +378,9 @@ export function FinancePanel({ appointments, barbers }: { appointments: Appointm
         <div className="overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.025]">
           <div className="border-b border-white/[0.07] px-5 py-4">
             <p className="text-sm font-bold">Par coiffeur</p>
-            <p className="text-xs text-white/35">Commission = % du prix reversé au coiffeur (réglable dans Paramètres → Coiffeurs)</p>
+            <p className="text-xs text-white/35">
+              Part coiffeur = ce que le coiffeur garde · Part salon = ce qui revient au propriétaire (réglable dans Paramètres → Coiffeurs)
+            </p>
           </div>
           <table className="w-full text-sm">
             <thead className="text-[11px] uppercase tracking-wider text-white/35">
@@ -385,18 +388,31 @@ export function FinancePanel({ appointments, barbers }: { appointments: Appointm
                 <th className="px-5 py-2 text-left font-semibold">Coiffeur</th>
                 <th className="px-3 py-2 text-right font-semibold">RDV</th>
                 <th className="px-3 py-2 text-right font-semibold">CA</th>
-                <th className="px-3 py-2 text-right font-semibold">Commission</th>
-                <th className="px-5 py-2 text-right font-semibold">Marge</th>
+                <th className="px-3 py-2 text-right font-semibold">Part coiffeur</th>
+                <th className="px-5 py-2 text-right font-semibold">Part salon</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.05]">
               {stats.perBarber.map((row) => (
                 <tr key={row.barber.id} className={row.barber.active ? "" : "opacity-50"}>
-                  <td className="px-5 py-2.5 font-semibold">{row.barber.name}</td>
+                  <td className="px-5 py-2.5 font-semibold">
+                    {row.barber.name}
+                    {row.barber.is_owner && (
+                      <span className="ml-2 rounded-full border border-white/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/50">
+                        Propriétaire
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{row.count}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{fmt(row.revenue)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-white/60">
-                    {fmt(row.commission)} <span className="text-white/30">({row.barber.commission_pct ?? 0} %)</span>
+                    {row.barber.is_owner ? (
+                      <span className="text-white/30">—</span>
+                    ) : (
+                      <>
+                        {fmt(row.commission)} <span className="text-white/30">({row.barber.commission_pct ?? 0} %)</span>
+                      </>
+                    )}
                   </td>
                   <td className="px-5 py-2.5 text-right font-bold tabular-nums">{fmt(row.margin)}</td>
                 </tr>

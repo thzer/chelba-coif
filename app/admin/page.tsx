@@ -435,7 +435,7 @@ export default function AdminPage() {
   async function loadBarbers() {
     const { data, error } = await supabase
       .from("barbers")
-      .select("id, name, active, sort_order, photo_url, bio, commission_pct")
+      .select("id, name, active, sort_order, photo_url, bio, commission_pct, is_owner")
       .order("sort_order")
       .order("id");
 

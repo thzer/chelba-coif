@@ -158,8 +158,12 @@ export function BarbersEditor({ barbers, onChange }: Props) {
             key={barber.id}
             barber={barber}
             busy={busyId === barber.id}
-            onSaveText={(name, bio, commission_pct) =>
-              update(barber, { name, bio, commission_pct }, "Impossible d'enregistrer ce coiffeur.")
+            onSaveText={(name, bio, commission_pct, is_owner) =>
+              update(
+                barber,
+                { name, bio, commission_pct: is_owner ? 0 : commission_pct, is_owner },
+                "Impossible d'enregistrer ce coiffeur."
+              )
             }
             onPhoto={(e) =>
               pickImage(e, setCropRequest, {
@@ -205,7 +209,12 @@ function BarberCard({
 }: {
   barber: Barber;
   busy: boolean;
-  onSaveText: (name: string, bio: string | null, commission_pct: number) => Promise<boolean>;
+  onSaveText: (
+    name: string,
+    bio: string | null,
+    commission_pct: number,
+    is_owner: boolean
+  ) => Promise<boolean>;
   onPhoto: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemovePhoto: () => void;
   onToggle: () => void;
@@ -214,12 +223,14 @@ function BarberCard({
   const [name, setName] = useState(barber.name);
   const [bio, setBio] = useState(barber.bio ?? "");
   const [commission, setCommission] = useState(String(barber.commission_pct ?? 0));
+  const [isOwner, setIsOwner] = useState(Boolean(barber.is_owner));
 
-  const commissionValue = Math.min(100, Math.max(0, Number(commission) || 0));
+  const commissionValue = isOwner ? 0 : Math.min(100, Math.max(0, Number(commission) || 0));
   const dirty =
     name.trim() !== barber.name ||
     (bio.trim() || null) !== (barber.bio ?? null) ||
-    commissionValue !== Number(barber.commission_pct ?? 0);
+    commissionValue !== Number(barber.commission_pct ?? 0) ||
+    isOwner !== Boolean(barber.is_owner);
 
   return (
     <div
@@ -262,19 +273,37 @@ function BarberCard({
             </p>
           </div>
 
-          <label className="flex items-center gap-2 text-xs text-white/50">
-            <span className="shrink-0">Commission</span>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              value={commission}
-              onChange={(e) => setCommission(e.target.value)}
-              className={`${inputClass} w-20 py-1.5 text-center`}
-            />
-            <span>% du prix de chaque prestation reversé au coiffeur (pour le calcul de la marge)</span>
-          </label>
+          <div className="space-y-2 rounded-xl border border-white/[0.07] bg-black/20 p-3 text-xs text-white/60">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={isOwner}
+                onChange={(e) => setIsOwner(e.target.checked)}
+                className="h-4 w-4 accent-white"
+              />
+              <span className="font-semibold text-white/80">Propriétaire du salon</span>
+              <span className="text-white/35">— garde 100 % de ses prestations</span>
+            </label>
+
+            {!isOwner && (
+              <label className="flex flex-wrap items-center gap-2">
+                <span className="shrink-0">Part gardée par le coiffeur</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={commission}
+                  onChange={(e) => setCommission(e.target.value)}
+                  className={`${inputClass} w-20 py-1.5 text-center`}
+                />
+                <span>%</span>
+                <span className="basis-full text-white/35">
+                  Le reste ({100 - Math.min(100, Math.max(0, Number(commission) || 0))} %) revient au salon.
+                </span>
+              </label>
+            )}
+          </div>
         </div>
       </div>
 
@@ -309,7 +338,7 @@ function BarberCard({
           <button
             type="button"
             disabled={busy || !name.trim()}
-            onClick={() => onSaveText(name.trim(), bio.trim() || null, commissionValue)}
+            onClick={() => onSaveText(name.trim(), bio.trim() || null, commissionValue, isOwner)}
             className="rounded-lg bg-emerald-400/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-400/25 disabled:opacity-50"
           >
             ✓ Enregistrer
