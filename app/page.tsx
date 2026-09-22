@@ -322,7 +322,20 @@ async function loadClosures() {
     }
 
     loadBookedAppointments();
-  }, [form.date]);
+
+    // Quelqu'un peut réserver pendant que le client choisit : on actualise
+    // régulièrement et au retour sur l'onglet.
+    if (!bookingOpen) return;
+
+    const interval = window.setInterval(loadBookedAppointments, 25000);
+    const onFocus = () => loadBookedAppointments();
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [form.date, bookingOpen]);
 
   function openBooking(service = "", barber = "") {
     setForm((prev) => ({
@@ -365,6 +378,7 @@ async function submitBooking(confirmedPhone: boolean) {
     !customerName ||
     !customerPhone
   ) {
+    setPhoneConfirm(null);
     return;
   }
 
@@ -427,7 +441,11 @@ async function submitBooking(confirmedPhone: boolean) {
   const barber = pickBarber(form.time, fresh);
 
   if (!barber) {
-    notify("error", t.err_taken_title, t.err_taken_text);
+    notify(
+      "error",
+      fill(t.conflict_title, { time: form.time }),
+      `${t.conflict_text} ${conflictDetails(form.time, fresh)}`
+    );
     setForm((prev) => ({ ...prev, time: "" }));
     setSubmitting(false);
     return;
@@ -452,8 +470,22 @@ async function submitBooking(confirmedPhone: boolean) {
   if (error) {
     console.error("Error creating appointment:", error);
 
-    if (error.code === "23505") {
-      notify("error", t.err_taken_title, t.err_taken_text);
+    // 23505 = même heure exacte, 23P01 = chevauchement (verrous de la base)
+    if (error.code === "23505" || error.code === "23P01") {
+      const { data: latest } = await supabase.rpc("get_booked_slots", {
+        target_date: form.date,
+      });
+      const refreshed = ((latest as BookedSlot[] | null) ?? []).map((slot) => ({
+        ...slot,
+        appointment_time: slot.appointment_time.slice(0, 5),
+      }));
+      setBookedAppointments(refreshed);
+
+      notify(
+        "error",
+        fill(t.conflict_title, { time: form.time }),
+        `${t.conflict_text} ${conflictDetails(form.time, refreshed)}`
+      );
       setForm((prev) => ({ ...prev, time: "" }));
       return;
     }
@@ -563,6 +595,54 @@ async function submitBooking(confirmedPhone: boolean) {
     : selectedBarber
     ? slotsFor(selectedBarber.id)
     : [...new Set(barbers.flatMap((b) => slotsFor(b.id)))].sort();
+
+  // Le créneau choisi vient d'être pris pendant que le client remplit le
+  // formulaire : on le retire et on prévient tout de suite.
+  const slotsKey = availableTimeSlots.join(",");
+  useEffect(() => {
+    if (!form.time || !form.barber || submitting || confirmed) return;
+    if (availableTimeSlots.includes(form.time)) return;
+
+    const lost = form.time;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setForm((prev) => ({ ...prev, time: "" }));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPhoneConfirm(null);
+    notify("error", fill(t.slot_gone_live, { time: lost }), t.conflict_text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotsKey, form.time, form.barber, submitting, confirmed]);
+
+  /**
+   * Explique pourquoi un créneau est pris et propose des solutions :
+   * les créneaux voisins du même coiffeur, et les coiffeurs libres à cette heure.
+   */
+  function conflictDetails(time: string, booked: BookedSlot[]) {
+    const others = barbers.filter(
+      (b) => (!selectedBarber || b.id !== selectedBarber.id) && slotsFor(b.id, booked).includes(time)
+    );
+
+    const sameBarberSlots = selectedBarber
+      ? slotsFor(selectedBarber.id, booked)
+      : [...new Set(barbers.flatMap((b) => slotsFor(b.id, booked)))].sort();
+
+    const toMin = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
+    const target = toMin(time);
+    const nearest = [...sameBarberSlots]
+      .sort((a, b) => Math.abs(toMin(a) - target) - Math.abs(toMin(b) - target))
+      .slice(0, 3)
+      .sort();
+
+    const parts: string[] = [];
+    if (nearest.length > 0) {
+      parts.push(fill(t.conflict_alt_times, { times: nearest.join(" · ") }));
+    }
+    if (others.length > 0) {
+      parts.push(fill(t.conflict_alt_barbers, { names: others.map((b) => b.name).join(", ") }));
+    }
+    if (parts.length === 0) parts.push(t.conflict_no_alt);
+
+    return parts.join(" ");
+  }
 
   /** Barbier à qui attribuer un créneau (le choisi, ou le premier libre). */
   function pickBarber(time: string, booked: BookedSlot[] = bookedAppointments) {

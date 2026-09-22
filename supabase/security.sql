@@ -139,6 +139,40 @@ alter table public.appointments
   add constraint appointments_status_check
   check (status in ('pending', 'confirmed', 'completed', 'cancelled'));
 
+-- Durée figée sur le RDV + verrou anti-chevauchement par coiffeur :
+-- deux rendez-vous actifs ne peuvent jamais se superposer, même partiellement.
+create extension if not exists btree_gist with schema extensions;
+
+alter table public.appointments add column if not exists duration_minutes integer;
+
+create or replace function public.set_appointment_duration()
+returns trigger language plpgsql security definer set search_path = public as $
+begin
+  if new.duration_minutes is null or new.duration_minutes <= 0 then
+    select coalesce(s.duration, 30) into new.duration_minutes
+    from public.services s where s.id = new.service_id;
+    new.duration_minutes := coalesce(new.duration_minutes, 30);
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists appointments_set_duration on public.appointments;
+create trigger appointments_set_duration
+  before insert or update of service_id on public.appointments
+  for each row execute function public.set_appointment_duration();
+
+alter table public.appointments drop constraint if exists appointments_no_overlap;
+alter table public.appointments
+  add constraint appointments_no_overlap
+  exclude using gist (
+    barber_id with =,
+    tsrange(
+      (appointment_date + appointment_time),
+      (appointment_date + appointment_time + make_interval(mins => coalesce(duration_minutes, 30)))
+    ) with &&
+  ) where (status in ('pending', 'confirmed'));
+
 -- Pas de double réservation sur un créneau actif, PAR BARBIER (le front gère 23505)
 drop index if exists appointments_unique_active_slot;
 create unique index if not exists appointments_unique_active_slot_per_barber

@@ -89,6 +89,12 @@ suivent automatiquement.
   validée par un code : la protection est appliquée par la base, pas
   seulement par l'interface. En cas de perte du téléphone : supprimer le
   facteur dans *Supabase → Authentication → Users → MFA*.
+- **Aucun double rendez-vous possible** : contrainte d'exclusion en base
+  (`appointments_no_overlap`) par coiffeur, qui tient compte de la durée du
+  service (11:00 45 min bloque 11:30). Côté client, les créneaux pris sont
+  masqués, la liste est actualisée toutes les 25 s pendant la réservation, et
+  un conflit affiche l'heure concernée avec les créneaux voisins libres et les
+  coiffeurs disponibles à cette heure.
 - **Annulation par le client** : chaque réservation a un jeton secret
   (`cancel_token`) → page `/rdv/<jeton>` (détails, annulation jusqu'à 2 h
   avant, opt-in rappel). Le lien est affiché à la confirmation et inclus dans
